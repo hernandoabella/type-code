@@ -38,7 +38,7 @@ const ACCENTS = [
 
 const MASTER_STYLE: React.CSSProperties = {
   fontFamily: '"Fira Code", monospace',
-  fontSize: "18px",
+  fontSize: "19px", // Subido un punto para mejor lectura
   lineHeight: "1.7",
   fontWeight: 450,
   tabSize: 4,
@@ -76,7 +76,7 @@ export default function NeuralSyncSimple() {
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [finished, autoPilot]);
+  }, [finished, autoPilot, level]);
 
   const handleInput = (val: string) => {
     if (finished || val.length > snippet.code.length) return;
@@ -104,27 +104,26 @@ export default function NeuralSyncSimple() {
   if (!mounted) return null;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-300 font-sans selection:bg-zinc-800">
-      {/* Header Minimalista */}
+    <div className="min-h-screen bg-[#080808] text-zinc-300 font-sans selection:bg-zinc-800 transition-colors duration-500">
       <nav className="flex h-20 items-center justify-between px-12">
         <div className="flex items-center gap-2">
-          <div className={`h-2 w-2 rounded-full ${accent.bg} transition-colors duration-500`} />
-          <span className="text-[11px] font-medium tracking-widest uppercase opacity-50">Sync</span>
+          <div className={`h-2 w-2 rounded-full ${accent.bg} transition-colors duration-500 shadow-[0_0_8px_rgba(255,255,255,0.2)]`} />
+          <span className="text-[11px] font-medium tracking-widest uppercase opacity-60">Neural.Sync</span>
         </div>
         
         <div className="flex items-center gap-8">
           <button 
             onClick={() => setAutoPilot(!autoPilot)}
-            className={`text-[10px] tracking-widest uppercase transition-opacity hover:opacity-100 ${autoPilot ? "opacity-100 text-emerald-400" : "opacity-30"}`}
+            className={`text-[10px] tracking-widest uppercase transition-all hover:opacity-100 ${autoPilot ? "opacity-100 text-emerald-400" : "opacity-30"}`}
           >
-            Auto {autoPilot ? "On" : "Off"}
+            AutoPilot {autoPilot ? "On" : "Off"}
           </button>
-          <div className="flex gap-3">
+          <div className="flex gap-4">
             {ACCENTS.map((a) => (
               <button 
                 key={a.name} 
                 onClick={() => setSelectedAccent(a)} 
-                className={`h-3 w-3 rounded-full transition-transform hover:scale-125 ${a.bg} ${selectedAccent.name === a.name ? "opacity-100 ring-4 ring-white/10" : "opacity-20"}`}
+                className={`h-3 w-3 rounded-full transition-all hover:scale-125 ${a.bg} ${selectedAccent.name === a.name ? "opacity-100 ring-2 ring-white/20 scale-110" : "opacity-20 hover:opacity-50"}`}
               />
             ))}
           </div>
@@ -133,21 +132,19 @@ export default function NeuralSyncSimple() {
 
       <main className="max-w-4xl mx-auto pt-12 px-6">
         <div className="content-fade space-y-12">
-          {/* Título y Descripción simple */}
-          <section className="space-y-2">
-            <h1 className="text-4xl font-light text-white tracking-tight">{snippet.title}</h1>
-            <p className="text-zinc-500 text-sm font-light">{snippet.description}</p>
+          <section className="space-y-3">
+            <h1 className="text-5xl font-light text-white tracking-tight">{snippet.title}</h1>
+            <p className="text-zinc-500 text-base font-light max-w-xl">{snippet.description}</p>
           </section>
 
-          {/* Terminal sin bordes ni sombras pesadas */}
           <div 
             ref={terminalRef} 
-            className="relative min-h-[300px] cursor-none"
+            className="relative min-h-[350px] cursor-none"
             onClick={() => textareaRef.current?.focus()}
           >
-            <div className="relative z-10 p-2">
-              {/* Fondo Guía (Sintaxis) */}
-              <div className="opacity-10 pointer-events-none select-none">
+            <div className="relative z-10">
+              {/* FONTO DE GUÍA: Opacidad subida al 40% */}
+              <div className="opacity-[0.4] pointer-events-none select-none transition-opacity duration-500">
                 <SyntaxHighlighter 
                   language={snippet.lang} 
                   style={atomDark} 
@@ -158,17 +155,22 @@ export default function NeuralSyncSimple() {
                 </SyntaxHighlighter>
               </div>
 
-              {/* Capa de Escritura Real */}
-              <div className="absolute inset-0 p-2 whitespace-pre pointer-events-none" style={MASTER_STYLE}>
+              {/* CAPA DE ESCRITURA: Texto del usuario con contraste alto */}
+              <div className="absolute inset-0 whitespace-pre pointer-events-none" style={MASTER_STYLE}>
                 {snippet.code.split("").map((char, i) => {
                   let color = "text-transparent";
+                  let extraStyle = "";
+                  
                   if (i < input.length) {
-                    color = input[i] === snippet.code[i] ? selectedAccent.class : "text-red-400";
+                    // Si es correcto, brilla con el color del acento. Si es error, rojo brillante.
+                    color = input[i] === snippet.code[i] ? selectedAccent.class : "text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.4)]";
+                    extraStyle = "opacity-100 font-medium";
                   }
+                  
                   return (
-                    <span key={i} className={`${color} relative transition-colors duration-150`}>
+                    <span key={i} className={`${color} ${extraStyle} relative transition-all duration-100`}>
                       {i === input.length && (
-                        <span className={`absolute left-0 top-0 h-full w-[1.5px] ${accent.bg} animate-pulse`} />
+                        <span className={`absolute left-0 top-0 h-[1.2em] w-[2px] ${accent.bg} animate-pulse shadow-[0_0_10px_rgba(255,255,255,0.5)]`} />
                       )}
                       {input[i] !== undefined 
                         ? (input[i] === " " ? "\u00A0" : input[i]) 
@@ -193,25 +195,31 @@ export default function NeuralSyncSimple() {
               }}
               spellCheck={false} 
               autoFocus 
-              className="absolute inset-0 w-full h-full opacity-0 cursor-none" 
+              className="absolute inset-0 w-full h-full opacity-0 cursor-none z-30" 
             />
           </div>
 
-          {/* Footer de Output Simple */}
-          <div className={`transition-all duration-700 ${finished ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
-            <div className="pt-8 border-t border-zinc-900 flex flex-col gap-6">
+          <div className={`transition-all duration-1000 transform ${finished ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
+            <div className="pt-10 border-t border-white/5 flex flex-col gap-8">
               <div className="flex items-center gap-3">
-                <VscCheck className="text-emerald-500" />
-                <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-emerald-500">Sync Complete</span>
-                {autoPilot && <span className="text-[10px] text-zinc-600 ml-auto">Next in {countDown}s</span>}
+                <div className="bg-emerald-500/10 p-1.5 rounded-full">
+                  <VscCheck className="text-emerald-400" size={16} />
+                </div>
+                <span className="text-[11px] uppercase tracking-[0.3em] font-bold text-emerald-400">Sequence Complete</span>
+                {autoPilot && (
+                  <span className="text-[10px] text-zinc-500 ml-auto font-medium">
+                    Next Sync: <span className="text-white">{countDown}s</span>
+                  </span>
+                )}
               </div>
               
-              <div className="bg-[#0f0f0f] rounded-2xl p-6">
-                <div className="flex items-center gap-2 mb-2 opacity-30">
-                  <VscTerminal size={12} />
-                  <span className="text-[9px] uppercase font-bold tracking-widest">Output</span>
+              <div className="bg-white/[0.02] backdrop-blur-sm rounded-3xl p-8 border border-white/[0.05]">
+                <div className="flex items-center gap-3 mb-4 opacity-40">
+                  <VscTerminal size={14} className="text-white" />
+                  <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-white">Console Output</span>
                 </div>
-                <div className="text-zinc-400 text-sm italic font-mono">
+                <div className="text-zinc-300 text-lg font-mono leading-relaxed bg-black/20 p-4 rounded-xl">
+                   <span className="text-zinc-600 mr-3 opacity-50">❯</span>
                    {snippet.output}
                 </div>
               </div>
