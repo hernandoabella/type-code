@@ -1,4 +1,10 @@
-import { VscEyeClosed, VscEye, VscRobot, VscCircuitBoard } from "react-icons/vsc";
+import { 
+  VscEyeClosed, 
+  VscEye, 
+  VscRobot, 
+  VscCircuitBoard, 
+  VscMap 
+} from "react-icons/vsc";
 
 export const MODES_CONFIG = [
   {
@@ -20,6 +26,13 @@ export const MODES_CONFIG = [
     label: "Auto",
     iconOn: VscCircuitBoard,
     iconOff: VscCircuitBoard,
-    activeClass: "bg-emerald-500/10 border-emerald-500/50 text-emerald-400",
+    activeClass: "bg-emerald-500/10 border-emerald-500/50 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]",
+  },
+  {
+    id: "zen", 
+    label: "Zen Mode",
+    iconOn: VscMap, 
+    iconOff: VscMap,
+    activeClass: "bg-amber-500/10 border-amber-500/50 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.25)]",
   }
 ];

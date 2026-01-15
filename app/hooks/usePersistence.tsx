@@ -13,7 +13,8 @@ interface PersistenceProps {
   setSelectedFont: (v: any) => void;
   setEditorTheme: (v: any) => void;
   setFontSize: (v: string) => void;
-  // Estados actuales para el guardado
+  setIsZenMode: (v: boolean) => void; 
+  
   states: {
     level: number;
     isGhostActive: boolean;
@@ -24,6 +25,7 @@ interface PersistenceProps {
     selectedFont: any;
     editorTheme: any;
     fontSize: string;
+    isZenMode: boolean;
   };
 }
 
@@ -37,10 +39,11 @@ export function usePersistence({
   setSelectedFont,
   setEditorTheme,
   setFontSize,
+  setIsZenMode,
   states
 }: PersistenceProps) {
   
-  // 1. EFECTO DE CARGA (Al montar el componente)
+  // 1. CARGA INICIAL: Recupera la configuración al montar el componente
   useEffect(() => {
     const savedLevel = localStorage.getItem('current_level');
     const savedGhost = localStorage.getItem('ghost_active');
@@ -51,14 +54,20 @@ export function usePersistence({
     const savedFont = localStorage.getItem('selected_font');
     const savedTheme = localStorage.getItem('editor_theme');
     const savedSize = localStorage.getItem('font_size');
+    const savedZen = localStorage.getItem('zen_mode');
 
     if (savedLevel) setLevel(parseInt(savedLevel));
     if (savedGhost !== null) setIsGhostActive(savedGhost === 'true');
+    
+    // PERSISTENCIA DEL BOT: Se mantiene activo tras refrescar (Instrucción 2026-01-15)
     if (savedBot !== null) setAutoWriting(savedBot === 'true');
+    
     if (savedAuto !== null) setAutoPilot(savedAuto === 'true');
     if (savedLang) setLangFilter(savedLang);
     if (savedSize) setFontSize(savedSize);
+    if (savedZen !== null) setIsZenMode(savedZen === 'true');
     
+    // Rehidratación de objetos desde las constantes
     if (savedAccent) {
       const found = ACCENTS.find(a => a.name === savedAccent);
       if (found) setSelectedAccent(found);
@@ -73,16 +82,28 @@ export function usePersistence({
     }
   }, []);
 
-  // 2. EFECTO DE GUARDADO (Cada vez que algo cambia)
+  // 2. GUARDADO AUTOMÁTICO: Sincroniza estados con LocalStorage
   useEffect(() => {
-    localStorage.setItem('current_level', states.level.toString());
-    localStorage.setItem('ghost_active', states.isGhostActive.toString());
-    localStorage.setItem('bot_active', states.autoWriting.toString());
-    localStorage.setItem('auto_pilot', states.autoPilot.toString());
-    localStorage.setItem('lang_filter', states.langFilter);
-    localStorage.setItem('selected_accent', states.selectedAccent.name);
-    localStorage.setItem('selected_font', states.selectedFont.name);
-    localStorage.setItem('editor_theme', states.editorTheme.name);
-    localStorage.setItem('font_size', states.fontSize);
+    // Validación de seguridad para evitar errores con propiedades de objetos (.name)
+    if (!states.selectedAccent?.name || !states.selectedFont?.name || !states.editorTheme?.name) return;
+
+    const storageMap = {
+      'current_level': states.level.toString(),
+      'ghost_active': states.isGhostActive.toString(),
+      'bot_active': states.autoWriting.toString(),
+      'auto_pilot': states.autoPilot.toString(),
+      'lang_filter': states.langFilter,
+      'selected_accent': states.selectedAccent.name,
+      'selected_font': states.selectedFont.name,
+      'editor_theme': states.editorTheme.name,
+      'font_size': states.fontSize,
+      'zen_mode': states.isZenMode.toString()
+    };
+
+    // Iteramos para guardar de forma limpia
+    Object.entries(storageMap).forEach(([key, value]) => {
+      localStorage.setItem(key, value);
+    });
+    
   }, [states]);
 }
