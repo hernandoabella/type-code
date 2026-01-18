@@ -38,6 +38,8 @@ interface NavbarProps {
   setIsRecallMode: (val: boolean) => void;
 }
 
+
+
 export const Navbar = ({
   accent,
   selectedAccent,
