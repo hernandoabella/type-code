@@ -142,15 +142,12 @@ export default function NeuralSyncMaster() {
     setTimeout(() => textareaRef.current?.focus(), 50);
   }, []);
 
-  useEffect(() => {
-    setMounted(true);
-    const savedLevel = localStorage.getItem('current_level');
-    const savedBot = localStorage.getItem('bot_active');
-    const savedZen = localStorage.getItem('zen_mode');
-    if (savedLevel) setLevel(parseInt(savedLevel));
-    if (savedBot !== null) setAutoWriting(savedBot === 'true');
-    if (savedZen !== null) setIsZenMode(savedZen === 'true');
-  }, []);
+useEffect(() => {
+  setMounted(true);
+  const savedBot = localStorage.getItem('bot_active');
+  // Usamos comparación estricta para booleanos guardados como string
+  if (savedBot === 'true') setAutoWriting(true);
+}, []);
 
   useEffect(() => {
     if (!mounted) return;
@@ -202,7 +199,37 @@ export default function NeuralSyncMaster() {
         gsap.to(".content-fade", { opacity: 1, duration: 0.4 });
     }});
   };
+  
+  // Dentro de NeuralSyncMaster
+useEffect(() => {
+  // Limpiamos cualquier intervalo previo siempre que cambie el estado o el snippet
+  if (autoWriteInterval.current) {
+    clearInterval(autoWriteInterval.current);
+    autoWriteInterval.current = null;
+  }
 
+  if (autoWriting && !finished && snippet) {
+    // Sincronizamos el índice con la longitud actual del input para que 
+    // si lo activas a mitad del código, continúe desde ahí.
+    let index = input.length;
+
+    autoWriteInterval.current = setInterval(() => {
+      if (index < snippet.code.length) {
+        index++;
+        const nextText = snippet.code.slice(0, index);
+        handleInput(nextText);
+      } else {
+        if (autoWriteInterval.current) clearInterval(autoWriteInterval.current);
+      }
+    }, 45);
+  }
+
+  return () => {
+    if (autoWriteInterval.current) clearInterval(autoWriteInterval.current);
+  };
+  // AGREGAMOS input.length a las dependencias para que si el bot se detiene
+  // y lo reactivas, sepa exactamente desde dónde empezar.
+}, [autoWriting, finished, snippet.code, handleInput, input.length]);
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
