@@ -13,7 +13,6 @@ interface UseNeuralEditorProps {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   isZenMode: boolean; 
   setIsZenMode: (val: boolean) => void;
-  // --- NUEVAS PROPS PARA RECALL ---
   isRecallMode: boolean;
 }
 
@@ -35,14 +34,12 @@ export function useNeuralEditor({
   const [startTime, setStartTime] = useState<number | null>(null);
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [wpm, setWpm] = useState(0);
-  
-  // Estado para controlar la visibilidad visual del código guía
   const [isCodeVisible, setIsCodeVisible] = useState(true);
 
   const autoWriteInterval = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // --- SALIR CON ESCAPE ---
+  // --- ESCAPE LOGIC ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isZenMode) setIsZenMode(false);
@@ -51,20 +48,10 @@ export function useNeuralEditor({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isZenMode, setIsZenMode]);
 
-  // --- LÓGICA DE MEMORY RECALL (GSAP) ---
+  // --- RECALL LOGIC (GHOST EFFECT) ---
+  // Separado totalmente del Bot para que no se pisen
   useEffect(() => {
-    // Si el usuario escribe el primer caracter en modo Recall
-    if (isRecallMode && input.length === 1 && !autoWriting) {
-      gsap.to(".source-code-layer", {
-        opacity: 0,
-        filter: "blur(10px)",
-        duration: 0.8,
-        ease: "power2.out",
-        onComplete: () => setIsCodeVisible(false)
-      });
-    }
-
-    // Resetear visibilidad si se borra todo o se apaga el modo
+    // Si NO estamos en recall, o el input está vacío, mostramos el código
     if (!isRecallMode || input.length === 0) {
       setIsCodeVisible(true);
       gsap.to(".source-code-layer", {
@@ -72,6 +59,18 @@ export function useNeuralEditor({
         filter: "blur(0px)",
         duration: 0.4,
         ease: "power2.in"
+      });
+      return;
+    }
+
+    // Si estamos en recall y empezamos a escribir (y el bot no está haciendo el trabajo)
+    if (isRecallMode && input.length >= 1 && !autoWriting) {
+      gsap.to(".source-code-layer", {
+        opacity: 0,
+        filter: "blur(15px)",
+        duration: 0.8,
+        ease: "power2.out",
+        onComplete: () => setIsCodeVisible(false)
       });
     }
   }, [isRecallMode, input.length, autoWriting]);
@@ -89,17 +88,6 @@ export function useNeuralEditor({
     return (input.length > 0 || autoWriting || isZenMode) && !finished;
   }, [input.length, autoWriting, isZenMode, finished]);
 
-  useEffect(() => {
-    if (terminalRef.current) {
-      gsap.to(terminalRef.current, {
-        scale: isZenMode ? 1.02 : 1,
-        y: isZenMode ? -10 : 0,
-        duration: 0.8,
-        ease: "expo.out"
-      });
-    }
-  }, [isZenMode, terminalRef]);
-
   const handleInput = useCallback(
     (val: string) => {
       if (finished || !snippet || val.length > snippet.code.length) return;
@@ -108,7 +96,6 @@ export function useNeuralEditor({
       const currentIsError = val.split("").some((char, i) => char !== snippet.code[i]);
       setIsError(currentIsError);
 
-      // Feedback de error (Shake)
       if (val.length > input.length && val[val.length - 1] !== snippet.code[val.length - 1]) {
         if (terminalRef.current) {
           gsap.fromTo(terminalRef.current, 
@@ -128,6 +115,35 @@ export function useNeuralEditor({
     [finished, snippet, startTime, input.length, terminalRef]
   );
 
+  // --- BOT FLOW FIX ---
+  useEffect(() => {
+    // Limpieza agresiva inicial
+    if (autoWriteInterval.current) {
+      clearInterval(autoWriteInterval.current);
+      autoWriteInterval.current = null;
+    }
+
+    if (autoWriting && !finished) {
+      // Sincronización: El bot empieza exactamente donde el input se quedó
+      let currentIndex = input.length;
+
+      autoWriteInterval.current = setInterval(() => {
+        if (currentIndex < snippet.code.length) {
+          currentIndex++;
+          const nextChar = snippet.code.slice(0, currentIndex);
+          handleInput(nextChar);
+        } else {
+          if (autoWriteInterval.current) clearInterval(autoWriteInterval.current);
+        }
+      }, botSpeed);
+    }
+
+    return () => {
+      if (autoWriteInterval.current) clearInterval(autoWriteInterval.current);
+    };
+    // Quitamos dependencias innecesarias que causaban el "quiebre" del flujo
+  }, [autoWriting, finished, snippet.code, botSpeed, handleInput]);
+
   const resetCurrentSnippet = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (autoWriteInterval.current) clearInterval(autoWriteInterval.current);
@@ -137,33 +153,9 @@ export function useNeuralEditor({
     setTimeElapsed(0);
     setWpm(0);
     setIsError(false);
-    if (terminalRef.current) {
-      gsap.fromTo(
-        terminalRef.current,
-        { scale: 0.98, opacity: 0.8 },
-        { scale: 1, opacity: 1, duration: 0.6, ease: "expo.out" }
-      );
-    }
+    setIsCodeVisible(true); // Reset visual
     setTimeout(() => textareaRef.current?.focus(), 50);
-  }, [terminalRef, textareaRef]);
-
-  // Bot Auto-write
-  useEffect(() => {
-    if (!autoWriting || finished) {
-      if (autoWriteInterval.current) clearInterval(autoWriteInterval.current);
-      return;
-    }
-    let currentIndex = input.length;
-    autoWriteInterval.current = setInterval(() => {
-      if (currentIndex < snippet.code.length) {
-        currentIndex++;
-        handleInput(snippet.code.slice(0, currentIndex));
-      } else {
-        clearInterval(autoWriteInterval.current!);
-      }
-    }, botSpeed);
-    return () => { if (autoWriteInterval.current) clearInterval(autoWriteInterval.current); };
-  }, [autoWriting, finished, snippet.code, handleInput, botSpeed]);
+  }, [textareaRef]);
 
   // Timer & WPM
   useEffect(() => {
@@ -179,14 +171,13 @@ export function useNeuralEditor({
       const currentWpm = Math.round((input.length / 5) / minutes);
       setWpm(currentWpm > 0 ? currentWpm : 0);
     }
-  }, [input.length, startTime, finished, timeElapsed]);
+  }, [input.length, startTime, finished]);
 
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
-    const dec = Math.floor((ms % 1000) / 100);
-    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}.${dec}`;
+    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
   };
 
   return {
@@ -196,7 +187,7 @@ export function useNeuralEditor({
     timeElapsed,
     wpm,
     isFocusMode,
-    isCodeVisible, // Exponemos esto para que el componente UI sepa si ocultar visualmente
+    isCodeVisible,
     MASTER_STYLE,
     handleInput,
     resetCurrentSnippet,
