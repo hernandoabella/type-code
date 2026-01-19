@@ -10,35 +10,23 @@ import {
 } from "react-icons/vsc";
 import gsap from "gsap";
 
+// Configuración y componentes
 import { HIGHLIGHT_THEMES, ACCENTS, FONTS, LANG_ICONS, SNIPPETS } from "./config/constants";
 import { Navbar } from "./components/Navbar";
 import { Sidebar } from "./components/Sidebar";
 
-export type SnippetLang = "javascript" | "typescript" | "python";
-export type SnippetLevel = "beginner" | "intermediate" | "advanced";
-export type SnippetCategory = "Hooks" | "Forms" | "Async" | "Types" | "Logic" | "Data" | "Performance";
-
-export interface Snippet {
-  id: string;
-  title: string;
-  category: SnippetCategory;
-  lang: SnippetLang;
-  level: SnippetLevel;
-  tags: string[];
-  icon: JSX.Element;
-  description: string;
-  realLifeUsage: string;
-  output?: string;
-  bestPractice?: boolean;
-  code: string;
-}
-
 export default function NeuralSyncMaster() {
   const [mounted, setMounted] = useState(false);
+  
+  // --- ESTADOS DE UI & LAYOUT ---
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isZenMode, setIsZenMode] = useState(false);
   const [selectedAccent, setSelectedAccent] = useState(ACCENTS[0]);
   const [selectedFont, setSelectedFont] = useState(FONTS[0]);
   const [editorTheme, setEditorTheme] = useState(HIGHLIGHT_THEMES[0]);
   const [fontSize, setFontSize] = useState("19px");
+
+  // --- ESTADOS DE LÓGICA ---
   const [isError, setIsError] = useState(false);
   const [langFilter, setLangFilter] = useState("all");
   const [level, setLevel] = useState(0);
@@ -46,7 +34,6 @@ export default function NeuralSyncMaster() {
   const [finished, setFinished] = useState(false);
   const [autoPilot, setAutoPilot] = useState(true);
   const [autoWriting, setAutoWriting] = useState(false);
-  const [isZenMode, setIsZenMode] = useState(false);
   const [isTimeActive, setIsTimeActive] = useState(true);
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -55,50 +42,20 @@ export default function NeuralSyncMaster() {
   const [isRecallMode, setIsRecallMode] = useState(false);
   const [isBlindMode, setIsBlindMode] = useState(false);
 
+  // Stats para la sidebar
   const userStats = { points: 12450, rank: "Neural Architect", accuracy: 98.2, streak: 12, completion: 74 };
 
+  // Refs
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
   const autoWriteInterval = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Memos
   const filteredPool = useMemo(() => SNIPPETS.filter(s => (langFilter === "all" || s.lang === langFilter)), [langFilter]);
   const languages = useMemo(() => ["all", ...Array.from(new Set(SNIPPETS.map(s => s.lang)))], []);
-  
   const snippet = filteredPool[level] || filteredPool[0];
   const accent = isError ? { class: "text-red-500", bg: "bg-red-500", shadow: "shadow-red-500/40" } : selectedAccent;
-
-  const resetAllProgress = useCallback(() => {
-    if (confirm("¿Estás seguro de que quieres reiniciar todo tu progreso?")) {
-      localStorage.clear();
-      setLevel(0);
-      setLangFilter("all");
-      resetCurrentSnippet();
-      window.location.reload();
-    }
-  }, []);
-
-  useEffect(() => {
-    const handleGlobalEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isZenMode) setIsZenMode(false);
-    };
-    window.addEventListener("keydown", handleGlobalEsc);
-    return () => window.removeEventListener("keydown", handleGlobalEsc);
-  }, [isZenMode]);
-
-  useEffect(() => {
-    if (isBlindMode) {
-      gsap.to(".recall-layer", { opacity: 0, duration: 0.3 });
-    } else {
-      if (isRecallMode && input.length === 1 && !autoWriting) {
-        gsap.to(".recall-layer", { opacity: 0, filter: "blur(20px)", scale: 0.95, duration: 0.8, ease: "power2.out" });
-      }
-      if (!isRecallMode || input.length === 0) {
-        gsap.to(".recall-layer", { opacity: 1, filter: "blur(0px)", scale: 1, duration: 0.4, ease: "power2.in" });
-      }
-    }
-  }, [isRecallMode, isBlindMode, input.length, autoWriting]);
-
   const isFocusMode = useMemo(() => (input.length > 0 || autoWriting) && !finished, [input, autoWriting, finished]);
 
   const MASTER_STYLE = useMemo(() => ({
@@ -109,64 +66,42 @@ export default function NeuralSyncMaster() {
     tabSize: 4,
   }), [selectedFont, fontSize]);
 
+  // --- FUNCIONES ---
   const handleInput = useCallback((val: string) => {
     if (finished || !snippet || val.length > snippet.code.length) return;
     if (!startTime && val.length > 0) setStartTime(Date.now());
+    
     const currentIsError = val.split("").some((char, i) => char !== snippet.code[i]);
     setIsError(currentIsError);
+
     if (val.length > input.length && val[val.length - 1] !== snippet.code[val.length - 1]) {
       gsap.fromTo(terminalRef.current, { x: -3 }, { x: 3, duration: 0.04, repeat: 3, yoyo: true });
     }
+
     setInput(val);
+    
     if (val === snippet.code && !currentIsError) {
       setFinished(true);
-      if (autoWriteInterval.current) { clearInterval(autoWriteInterval.current); autoWriteInterval.current = null; }
+      if (autoWriteInterval.current) clearInterval(autoWriteInterval.current);
       if (timerRef.current) clearInterval(timerRef.current);
     }
   }, [finished, snippet, startTime, input.length]);
 
   const resetCurrentSnippet = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
-    if (autoWriteInterval.current) { clearInterval(autoWriteInterval.current); autoWriteInterval.current = null; }
+    if (autoWriteInterval.current) clearInterval(autoWriteInterval.current);
     setInput(""); setFinished(false); setStartTime(null); setTimeElapsed(0);
     setWpm(0); setIsError(false); setAutoWriting(false);
     gsap.fromTo(terminalRef.current, { scale: 0.99, opacity: 0.8 }, { scale: 1, opacity: 1, duration: 0.4, ease: "expo.out" });
     setTimeout(() => textareaRef.current?.focus(), 50);
   }, []);
 
+  // --- EFECTOS ---
   useEffect(() => {
     setMounted(true);
     const savedBot = localStorage.getItem('bot_active');
     if (savedBot === 'true') setAutoWriting(true);
   }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
-    localStorage.setItem('bot_active', autoWriting.toString());
-    localStorage.setItem('zen_mode', isZenMode.toString());
-    localStorage.setItem('current_level', level.toString());
-  }, [autoWriting, isZenMode, level, mounted]);
-
-  useEffect(() => {
-    if (autoWriteInterval.current) { clearInterval(autoWriteInterval.current); autoWriteInterval.current = null; }
-    if (autoWriting && !finished && snippet) {
-      let index = input.length;
-      autoWriteInterval.current = setInterval(() => {
-        if (index < snippet.code.length) {
-          index++;
-          handleInput(snippet.code.slice(0, index));
-        } else {
-          if (autoWriteInterval.current) clearInterval(autoWriteInterval.current);
-        }
-      }, 45);
-    }
-    return () => { if (autoWriteInterval.current) clearInterval(autoWriteInterval.current); };
-  }, [autoWriting, finished, snippet.code, handleInput, input.length]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    resetCurrentSnippet();
-  }, [level, langFilter, mounted, resetCurrentSnippet]);
 
   useEffect(() => {
     if (startTime && !finished && isTimeActive) {
@@ -182,69 +117,51 @@ export default function NeuralSyncMaster() {
     }
   }, [input, startTime, finished]);
 
-  const nextSnippet = () => {
-    gsap.to(".content-fade", { opacity: 0, duration: 0.3, onComplete: () => {
-        setLevel(l => (l + 1) % filteredPool.length);
-        gsap.to(".content-fade", { opacity: 1, duration: 0.4 });
-    }});
-  };
-
-  const prevSnippet = () => {
-    gsap.to(".content-fade", { opacity: 0, duration: 0.3, onComplete: () => {
-        setLevel(l => (l - 1 + filteredPool.length) % filteredPool.length);
-        gsap.to(".content-fade", { opacity: 1, duration: 0.4 });
-    }});
-  };
-  
-  const formatTime = (ms: number) => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (autoWriting || finished) return;
-    if (e.key === "Tab") {
-      e.preventDefault();
-      const { selectionStart, selectionEnd } = e.currentTarget;
-      const tabSpaces = "    "; 
-      const newValue = input.substring(0, selectionStart) + tabSpaces + input.substring(selectionEnd);
-      handleInput(newValue);
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.selectionStart = textareaRef.current.selectionEnd = selectionStart + tabSpaces.length;
-        }
-      }, 0);
+  useEffect(() => {
+    if (autoWriting && !finished && snippet) {
+      let index = input.length;
+      autoWriteInterval.current = setInterval(() => {
+        if (index < snippet.code.length) {
+          index++;
+          handleInput(snippet.code.slice(0, index));
+        } else if (autoWriteInterval.current) clearInterval(autoWriteInterval.current);
+      }, 45);
     }
-  };
+    return () => { if (autoWriteInterval.current) clearInterval(autoWriteInterval.current); };
+  }, [autoWriting, finished, snippet.code, handleInput, input.length]);
 
   if (!mounted) return null;
 
   return (
     <div className="min-h-screen w-screen bg-[#050505] text-zinc-300 font-sans flex overflow-hidden">
       
-      {/* SIDEBAR ELEGANTE (LADO DERECHO, ESTILO CHATGPT) */}
+      {/* SIDEBAR INTEGRADA */}
       {!isZenMode && (
-        <aside className="fixed right-0 top-0 h-full w-80 bg-[#080808] border-l border-white/5 z-[110] shadow-2xl transition-transform duration-500">
-          <Sidebar userStats={userStats} isBlindMode={isBlindMode} />
-        </aside>
+        <Sidebar 
+          userStats={userStats} 
+          isBlindMode={isBlindMode} 
+          isOpen={isSidebarOpen} 
+          setIsOpen={setIsSidebarOpen} 
+        />
       )}
 
-      {/* CONTENEDOR PRINCIPAL - AJUSTADO AL ESPACIO DISPONIBLE */}
-      <main className={`flex-1 relative h-screen overflow-y-auto transition-all duration-500 ${!isZenMode ? 'pr-80' : 'pr-0'}`}>
+      {/* CONTENEDOR PRINCIPAL: Expansión dinámica */}
+      <main className={`flex-1 relative h-screen overflow-y-auto transition-all duration-500 ease-in-out ${(!isZenMode && isSidebarOpen) ? 'pr-80' : 'pr-0'}`}>
         
         {/* BOTÓN MASTER RESET */}
-        <button 
-          onClick={resetAllProgress}
-          className="fixed top-8 left-8 z-[110] flex items-center gap-2 px-4 py-2 bg-red-500/5 hover:bg-red-500/20 border border-red-500/20 rounded-xl transition-all group opacity-40 hover:opacity-100"
-        >
-          <VscTrash className="text-red-400 group-hover:scale-110 transition-transform" />
+        <button onClick={() => window.location.reload()} className="fixed top-8 left-8 z-[110] flex items-center gap-2 px-4 py-2 bg-red-500/5 hover:bg-red-500/20 border border-red-500/20 rounded-xl transition-all opacity-40 hover:opacity-100">
+          <VscTrash className="text-red-400" />
           <span className="text-[10px] font-black uppercase tracking-widest text-red-400/80">Reset_System</span>
         </button>
 
-        {/* STATS FOOTER (CENTRADO EN EL ÁREA DE JUEGO) */}
-        <div className={`fixed bottom-8 left-[calc(50%-160px)] ${isZenMode ? 'left-1/2' : ''} -translate-x-1/2 z-[100] flex items-center gap-8 bg-black/80 backdrop-blur-3xl border border-white/10 px-10 py-5 rounded-[2rem] shadow-2xl transition-all duration-500`}>
+        {/* STATS FOOTER: Centrado Inteligente según el Layout */}
+        <div 
+          className="fixed bottom-8 z-[100] flex items-center gap-8 bg-black/80 backdrop-blur-3xl border border-white/10 px-10 py-5 rounded-[2rem] shadow-2xl transition-all duration-500 ease-in-out"
+          style={{ 
+            left: (!isZenMode && isSidebarOpen) ? 'calc(50% - 160px)' : '50%',
+            transform: 'translateX(-50%)'
+          }}
+        >
           <div className="flex flex-col border-r border-white/10 pr-8 text-center min-w-[80px]">
             <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Velocity</span>
             <div className="flex items-baseline gap-2 justify-center font-mono">
@@ -252,19 +169,20 @@ export default function NeuralSyncMaster() {
               <span className={`${accent.class} text-[10px] font-bold`}>WPM</span>
             </div>
           </div>
-          <div className={`flex flex-col border-r border-white/10 pr-8 text-center min-w-[120px]`}>
+          <div className="flex flex-col border-r border-white/10 pr-8 text-center min-w-[120px]">
             <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Time</span>
             <div className="flex items-baseline gap-2 justify-center font-mono text-white">
-              <span className="text-4xl font-black">{formatTime(timeElapsed)}</span>
+              <span className="text-4xl font-black">{Math.floor(timeElapsed / 1000)}s</span>
             </div>
           </div>
-          <div className="flex items-center gap-3 pr-2">
-             <button onClick={prevSnippet} className="p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition-all active:scale-90"><VscChevronLeft size={20} /></button>
-             <button onClick={nextSnippet} className="p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition-all active:scale-90"><VscChevronRight size={20} /></button>
+          <div className="flex items-center gap-3">
+             <button onClick={() => setLevel(l => l - 1)} className="p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition-all"><VscChevronLeft size={20} /></button>
+             <button onClick={() => setLevel(l => l + 1)} className="p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition-all"><VscChevronRight size={20} /></button>
           </div>
         </div>
 
-        <div className="max-w-[1200px] mx-auto w-full flex flex-col gap-12 p-8 lg:p-20 pt-32 pb-40">
+        {/* ÁREA DE JUEGO */}
+        <div className="max-w-[1200px] mx-auto w-full flex flex-col gap-12 p-8 lg:p-20 pt-32 pb-40 transition-all duration-500">
           <Navbar 
             accent={accent} selectedAccent={selectedAccent} setSelectedAccent={setSelectedAccent}
             langFilter={langFilter} setLangFilter={setLangFilter} languages={languages}
@@ -279,74 +197,58 @@ export default function NeuralSyncMaster() {
             isBlindMode={isBlindMode} setIsBlindMode={setIsBlindMode}
           />
 
-          {snippet ? (
-            <div className="content-fade grid grid-cols-1 items-start relative mt-8">
-              {/* DESCRIPCIÓN FLOTANTE LATERAL IZQUIERDA (Cuando no hay foco) */}
-              <div className={`transition-all duration-1000 ease-[cubic-bezier(0.19,1,0.22,1)] flex flex-col gap-6 fixed left-12 top-48 z-0 ${ (isFocusMode || isZenMode) ? 'opacity-0 -translate-x-32 pointer-events-none' : 'opacity-100 translate-x-0 w-[300px]'}`}>
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-2">
-                      <div className={`p-2 rounded-xl bg-white/5 border border-white/10`}>{LANG_ICONS[snippet.lang]}</div>
-                      <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">{snippet.category}</span>
-                    </div>
-                    <h1 className="text-4xl font-black text-white tracking-tighter leading-none uppercase">{snippet.title}</h1>
-                    <div className="space-y-6 italic text-zinc-400 text-lg border-l-2 border-white/5 pl-6 leading-relaxed">{snippet.description}</div>
+          <div className="content-fade grid grid-cols-1 items-start relative mt-8">
+            {/* DESCRIPCIÓN (Se oculta en foco) */}
+            <div className={`transition-all duration-1000 ease-out flex flex-col gap-6 fixed left-12 top-48 z-0 ${ (isFocusMode || isZenMode) ? 'opacity-0 -translate-x-32 pointer-events-none' : 'opacity-100 translate-x-0 w-[300px]'}`}>
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-white">{LANG_ICONS[snippet.lang]}</div>
+                    <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">{snippet.category}</span>
                   </div>
-              </div>
-
-              {/* ZONA DE JUEGO CENTRAL */}
-              <div className={`transition-all duration-1000 ease-[cubic-bezier(0.19,1,0.22,1)] w-full max-w-[900px] mx-auto space-y-8 relative z-10`}>
-                <div className="relative group">
-                  <div className={`absolute -inset-1 rounded-[3.5rem] blur opacity-10 transition duration-1000 ${accent.bg}`} />
-                  
-                  <button 
-                    onClick={resetCurrentSnippet} 
-                    className={`absolute top-8 right-8 z-50 p-4 rounded-2xl bg-black/50 backdrop-blur-md border border-white/10 transition-all hover:bg-white/10 active:scale-90 flex items-center gap-3 group/btn ${ (isFocusMode || isZenMode) ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
-                  >
-                    <VscRefresh size={18} className="group-hover/btn:rotate-180 transition-transform duration-500" />
-                    <span className="text-[9px] font-black uppercase tracking-widest">Reset</span>
-                  </button>
-
-                  <div ref={terminalRef} className={`relative p-12 lg:p-16 bg-[#080808] rounded-[3.5rem] border border-white/10 shadow-3xl transition-all duration-700 min-h-[400px] overflow-visible cursor-none`} onClick={() => textareaRef.current?.focus()}>
-                    {/* GHOST LAYER */}
-                    <div className="recall-layer opacity-20 pointer-events-none select-none transition-all duration-500" style={isGhostActive && !isBlindMode ? { maskImage: 'linear-gradient(to right, black 0%, transparent 40%)', WebkitMaskImage: 'linear-gradient(to right, black 0%, transparent 40%)', filter: 'blur(4px)' } : { opacity: 0 }}>
-                      <SyntaxHighlighter language={snippet.lang} style={editorTheme.style} customStyle={{ margin: 0, padding: 0, background: "transparent", ...MASTER_STYLE }} codeTagProps={{ style: MASTER_STYLE }}>{snippet.code}</SyntaxHighlighter>
-                    </div>
-                    
-                    {/* INPUT LAYER */}
-                    <div className="absolute inset-0 p-12 lg:p-16 z-10 pointer-events-none" style={MASTER_STYLE}>
-                      <div className={isBlindMode ? "opacity-0" : "opacity-100 transition-opacity duration-300"}>
-                        <SyntaxHighlighter language={snippet.lang} style={editorTheme.style} customStyle={{ margin: 0, padding: 0, background: "transparent", overflow: "visible" }} codeTagProps={{ style: { ...MASTER_STYLE, color: 'inherit' } }}>{input}</SyntaxHighlighter>
-                      </div>
-                      <div className="absolute top-12 lg:top-16 left-12 lg:left-16 whitespace-pre pointer-events-none">
-                          <span className="invisible">{input}</span>
-                          {input.length < snippet.code.length && (
-                              <>
-                                  <span className={`inline-block w-[3px] h-[1.2em] translate-y-[0.15em] ${accent.bg} shadow-[0_0_15px_currentColor] animate-pulse`} />
-                                  <span className={`recall-layer transition-all duration-300 ${isGhostActive && !isBlindMode ? 'text-zinc-400' : 'text-transparent'}`} style={isGhostActive ? { maskImage: 'linear-gradient(to right, black 0%, transparent 250px)', WebkitMaskImage: 'linear-gradient(to right, black 0%, transparent 250px)', filter: 'blur(1px)' } : {}}>{snippet.code.slice(input.length)}</span>
-                              </>
-                          )}
-                      </div>
-                    </div>
-                    <textarea ref={textareaRef} value={input} onChange={(e) => handleInput(e.target.value)} onKeyDown={handleKeyDown} spellCheck={false} autoFocus className={`absolute inset-0 w-full h-full opacity-0 z-30 ${finished ? 'cursor-default' : 'cursor-none'}`} disabled={autoWriting || finished} />
-                  </div>
+                  <h1 className="text-4xl font-black text-white tracking-tighter leading-none uppercase">{snippet.title}</h1>
+                  <p className="italic text-zinc-400 text-lg border-l-2 border-white/5 pl-6 leading-relaxed">{snippet.description}</p>
                 </div>
+            </div>
 
-                {/* OUTPUT AREA */}
-                <div className={`transition-all duration-700 flex items-center gap-6 ${finished ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-10 opacity-0 scale-95 pointer-events-none'}`}>
-                  <div className="flex-1 bg-[#0c0c0c] border border-white/10 rounded-3xl p-8 shadow-2xl flex items-center justify-between">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-3 text-[10px] font-black uppercase text-zinc-500 tracking-tighter">System_Output</div>
-                      <pre className="font-mono text-sm text-zinc-400 italic">{snippet.output}</pre>
+            {/* TERMINAL CENTRAL */}
+            <div className="w-full max-w-[900px] mx-auto space-y-8 relative z-10 transition-all duration-500">
+              <div className="relative group">
+                <div className={`absolute -inset-1 rounded-[3.5rem] blur opacity-10 transition duration-1000 ${accent.bg}`} />
+                
+                <button onClick={resetCurrentSnippet} className={`absolute top-8 right-8 z-50 p-4 rounded-2xl bg-black/50 backdrop-blur-md border border-white/10 transition-all hover:bg-white/10 ${ (isFocusMode || isZenMode) ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+                  <VscRefresh size={18} />
+                </button>
+
+                <div ref={terminalRef} className="relative p-12 lg:p-16 bg-[#080808] rounded-[3.5rem] border border-white/10 shadow-3xl min-h-[400px] cursor-none" onClick={() => textareaRef.current?.focus()}>
+                  {/* Capas de Texto (Ghost & Input) */}
+                  <div className="opacity-20 pointer-events-none select-none transition-all" style={isGhostActive && !isBlindMode ? { filter: 'blur(4px)' } : { opacity: 0 }}>
+                    <SyntaxHighlighter language={snippet.lang} style={editorTheme.style} customStyle={{ margin: 0, padding: 0, background: "transparent", ...MASTER_STYLE }}>{snippet.code}</SyntaxHighlighter>
+                  </div>
+                  
+                  <div className="absolute inset-0 p-12 lg:p-16 z-10 pointer-events-none" style={MASTER_STYLE}>
+                    <div className={isBlindMode ? "opacity-0" : "opacity-100 transition-opacity"}>
+                      <SyntaxHighlighter language={snippet.lang} style={editorTheme.style} customStyle={{ margin: 0, padding: 0, background: "transparent" }}>{input}</SyntaxHighlighter>
+                    </div>
+                    {/* Cursor Animado */}
+                    <div className="absolute top-12 lg:top-16 left-12 lg:left-16 whitespace-pre">
+                      <span className="invisible">{input}</span>
+                      {input.length < snippet.code.length && <span className={`inline-block w-[3px] h-[1.2em] translate-y-[0.15em] ${accent.bg} animate-pulse shadow-[0_0_15px_currentColor]`} />}
                     </div>
                   </div>
-                  <button onClick={resetCurrentSnippet} className="group flex flex-col items-center justify-center gap-2 p-8 bg-white/[0.03] border border-white/10 rounded-3xl hover:bg-white/[0.08] transition-all active:scale-95">
-                    <VscRefresh size={24} className="group-hover:rotate-180 transition-transform duration-500 text-white" />
-                    <span className="text-[10px] font-black uppercase text-white/40 font-sans">Retry</span>
-                  </button>
+
+                  <textarea 
+                    ref={textareaRef} 
+                    value={input} 
+                    onChange={(e) => handleInput(e.target.value)} 
+                    spellCheck={false} 
+                    autoFocus 
+                    className="absolute inset-0 w-full h-full opacity-0 z-30 cursor-none" 
+                    disabled={autoWriting || finished} 
+                  />
                 </div>
               </div>
             </div>
-          ) : null}
+          </div>
         </div>
       </main>
     </div>
