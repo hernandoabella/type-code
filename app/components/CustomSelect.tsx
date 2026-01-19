@@ -2,8 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { VscChevronDown, VscCode } from "react-icons/vsc";
-import { LANG_ICONS } from "@/app/config/icons";
-import { SNIPPETS } from "@/app/config/snippets";
+import { LANG_ICONS, SNIPPETS } from "@/app/config/constants";
 import { IconType } from "react-icons";
 
 interface CustomSelectProps {
