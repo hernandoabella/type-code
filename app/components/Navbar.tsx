@@ -74,7 +74,7 @@ export const Navbar = ({
         {/* IZQUIERDA: Brand */}
         <div className="flex items-center gap-6">
           <div className="flex flex-col -space-y-1">
-            <span className="text-xl font-black text-white tracking-tighter italic">
+            <span className="text-xl font-black text-white tracking-tighter">
               Type<span className={`${accent.class} drop-shadow-[0_0_8px_currentColor]`}>Code</span>
             </span>
           </div>
