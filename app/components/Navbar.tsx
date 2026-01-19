@@ -38,8 +38,6 @@ interface NavbarProps {
   setIsRecallMode: (val: boolean) => void;
 }
 
-
-
 export const Navbar = ({
   accent,
   selectedAccent,
@@ -66,17 +64,19 @@ export const Navbar = ({
 }: NavbarProps) => {
 
   return (
-    <nav className={`relative w-full transition-all duration-1000 ${isZenMode ? "opacity-0 -translate-y-20 pointer-events-none" : "opacity-100 translate-y-0"}`}>
+    /* 1. Elevamos el z-index de todo el nav a 100 para superar la terminal */
+    <nav className={`relative w-full z-[100] transition-all duration-1000 ${isZenMode ? "opacity-0 -translate-y-20 pointer-events-none" : "opacity-100 translate-y-0"}`}>
       
       {/* BARRA PRINCIPAL (TOP) */}
-      <div className="flex h-16 items-center justify-between px-8 bg-black/40 backdrop-blur-3xl border border-white/10 rounded-full shadow-2xl relative z-20">
+      {/* 2. z-50 para que los CustomSelect se desplieguen por encima de la barra de modos inferior */}
+      <div className="flex h-16 items-center justify-between px-8 bg-black/40 backdrop-blur-3xl border border-white/10 rounded-full shadow-2xl relative z-50">
         
         {/* IZQUIERDA: Brand */}
         <div className="flex items-center gap-6">
           <div className="flex flex-col -space-y-1">
             <span className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30 ml-1">Neural</span>
             <span className="text-xl font-black text-white tracking-tighter italic">
-              Type<span className={`${accent.class} drop-shadow-[0_0_8px_currentColor]`}>Sync</span>
+              Type<span className={`${accent.class} drop-shadow-[0_0_8px_currentColor]`}>Code</span>
             </span>
           </div>
           <div className="h-8 w-px bg-white/10" />
@@ -92,37 +92,32 @@ export const Navbar = ({
           <CustomSelect label="Theme" value={editorTheme.name} options={HIGHLIGHT_THEMES} onChange={setEditorTheme} icon={VscColorMode} />
         </div>
 
-        {/* DERECHA: Zen Toggle (Único botón arriba) */}
-        <div className="flex items-center">
-             {/* DERECHA: Zen Toggle */}
-<div className="flex items-center px-4">
-  <button 
-    onClick={() => setIsZenMode(true)}
-    className="group relative flex items-center gap-3 py-2 px-4 rounded-xl hover:bg-white/[0.03] transition-all duration-300"
-    title="Press ESC to exit Zen Mode"
-  >
-    <div className="flex flex-col items-end">
-      <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-30 group-hover:opacity-100 transition-opacity">
-        Focus
-      </span>
-    </div>
-    
-    <div className="relative">
-      {/* Círculo de pulsación sutil de fondo */}
-      <div className="absolute inset-0 bg-white/10 rounded-full scale-0 group-hover:scale-150 opacity-0 group-hover:opacity-20 transition-all duration-500 blur-sm" />
-      
-      <VscTarget 
-        size={20} 
-        className="relative text-white/40 group-hover:text-white group-hover:rotate-90 transition-all duration-500 ease-out" 
-      />
-    </div>
-  </button>
-</div>
+        {/* DERECHA: Zen Toggle */}
+        <div className="flex items-center px-4">
+          <button 
+            onClick={() => setIsZenMode(true)}
+            className="group relative flex items-center gap-3 py-2 px-4 rounded-xl hover:bg-white/[0.03] transition-all duration-300"
+            title="Press ESC to exit Zen Mode"
+          >
+            <div className="flex flex-col items-end">
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-30 group-hover:opacity-100 transition-opacity">
+                Focus
+              </span>
+            </div>
+            <div className="relative">
+              <div className="absolute inset-0 bg-white/10 rounded-full scale-0 group-hover:scale-150 opacity-0 group-hover:opacity-20 transition-all duration-500 blur-sm" />
+              <VscTarget 
+                size={20} 
+                className="relative text-white/40 group-hover:text-white group-hover:rotate-90 transition-all duration-500 ease-out" 
+              />
+            </div>
+          </button>
         </div>
       </div>
 
       {/* BARRA INFERIOR (DOWN): Activaciones y Acentos */}
-      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 flex items-center gap-4 animate-in fade-in slide-in-from-top-2 duration-700">
+      {/* 3. z-40 para que esté por encima de la terminal pero por debajo de la barra superior si hay colisión */}
+      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 flex items-center gap-4 animate-in fade-in slide-in-from-top-2 duration-700 z-40">
         
         {/* PANEL DE MODOS */}
         <div className="flex items-center gap-1.5 p-1.5 bg-black/60 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-xl">
