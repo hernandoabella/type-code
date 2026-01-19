@@ -1,15 +1,15 @@
 "use client";
 
 import { 
-  VscCircuitBoard, 
   VscTypeHierarchy, 
   VscColorMode, 
   VscTextSize,
   VscEye,      
   VscEyeClosed, 
   VscTarget,
-  VscLock,    // Icono para Blind Mode ON
-   // Icono para Blind Mode OFF
+  VscLock,
+  VscFlame,     // Icono para Hardcore Mode ON
+  VscHistory    // Icono opcional para Hardcore Mode OFF o Reset
 } from "react-icons/vsc";
 import { CustomSelect } from "./CustomSelect";
 import { ModeButton } from "./ModeButton";
@@ -38,9 +38,11 @@ interface NavbarProps {
   setIsZenMode: (val: boolean) => void;
   isRecallMode: boolean;
   setIsRecallMode: (val: boolean) => void;
-  // --- NUEVO PROP ---
   isBlindMode: boolean;
   setIsBlindMode: (val: boolean) => void;
+  // --- NUEVAS PROPS HARDCORE ---
+  isHardcoreMode: boolean;
+  setIsHardcoreMode: (val: boolean) => void;
 }
 
 export const Navbar = ({
@@ -68,6 +70,8 @@ export const Navbar = ({
   setIsRecallMode,
   isBlindMode,
   setIsBlindMode,
+  isHardcoreMode,
+  setIsHardcoreMode,
 }: NavbarProps) => {
 
   return (
@@ -125,7 +129,19 @@ export const Navbar = ({
         {/* PANEL DE MODOS */}
         <div className="flex items-center gap-1.5 p-1.5 bg-black/60 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-xl">
           
-          {/* MODO RECALL (Especial - Morado) */}
+          {/* MODO HARDCORE (Especial - Rojo Brillante) */}
+          <ModeButton
+            label="Hardcore"
+            active={isHardcoreMode}
+            onClick={() => setIsHardcoreMode(!isHardcoreMode)}
+            iconOn={VscFlame}
+            iconOff={VscFlame}
+            activeClass="bg-red-500/20 border-red-500/50 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)] animate-pulse"
+          />
+
+          <div className="w-px h-4 bg-white/10 mx-1" />
+
+          {/* MODO RECALL (Morado) */}
           <ModeButton
             label="Recall"
             active={isRecallMode}
@@ -135,7 +151,7 @@ export const Navbar = ({
             activeClass="bg-purple-500/20 border-purple-500/50 text-purple-400"
           />
 
-          {/* MODO BLIND (Nuevo - Naranja) */}
+          {/* MODO BLIND (Naranja) */}
           <ModeButton
             label="Blind"
             active={isBlindMode}
