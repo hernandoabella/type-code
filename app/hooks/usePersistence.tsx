@@ -14,6 +14,8 @@ interface PersistenceProps {
   setEditorTheme: (v: any) => void;
   setFontSize: (v: string) => void;
   setIsZenMode: (v: boolean) => void; 
+  setIsRecallMode: (v: boolean) => void; // Nueva prop
+  setIsBlindMode: (v: boolean) => void;  // Nueva prop
   
   states: {
     level: number;
@@ -26,6 +28,8 @@ interface PersistenceProps {
     editorTheme: any;
     fontSize: string;
     isZenMode: boolean;
+    isRecallMode: boolean; // Nueva prop
+    isBlindMode: boolean;  // Nueva prop
   };
 }
 
@@ -40,10 +44,12 @@ export function usePersistence({
   setEditorTheme,
   setFontSize,
   setIsZenMode,
+  setIsRecallMode,
+  setIsBlindMode,
   states
 }: PersistenceProps) {
   
-  // 1. CARGA INICIAL: Recupera la configuración al montar el componente
+  // 1. CARGA INICIAL
   useEffect(() => {
     const savedLevel = localStorage.getItem('current_level');
     const savedGhost = localStorage.getItem('ghost_active');
@@ -55,19 +61,20 @@ export function usePersistence({
     const savedTheme = localStorage.getItem('editor_theme');
     const savedSize = localStorage.getItem('font_size');
     const savedZen = localStorage.getItem('zen_mode');
+    const savedRecall = localStorage.getItem('recall_active');
+    const savedBlind = localStorage.getItem('blind_mode');
 
     if (savedLevel) setLevel(parseInt(savedLevel));
     if (savedGhost !== null) setIsGhostActive(savedGhost === 'true');
-    
-    // PERSISTENCIA DEL BOT: Se mantiene activo tras refrescar (Instrucción 2026-01-15)
     if (savedBot !== null) setAutoWriting(savedBot === 'true');
-    
     if (savedAuto !== null) setAutoPilot(savedAuto === 'true');
     if (savedLang) setLangFilter(savedLang);
     if (savedSize) setFontSize(savedSize);
     if (savedZen !== null) setIsZenMode(savedZen === 'true');
+    if (savedRecall !== null) setIsRecallMode(savedRecall === 'true');
+    if (savedBlind !== null) setIsBlindMode(savedBlind === 'true');
     
-    // Rehidratación de objetos desde las constantes
+    // Rehidratación de objetos
     if (savedAccent) {
       const found = ACCENTS.find(a => a.name === savedAccent);
       if (found) setSelectedAccent(found);
@@ -82,9 +89,8 @@ export function usePersistence({
     }
   }, []);
 
-  // 2. GUARDADO AUTOMÁTICO: Sincroniza estados con LocalStorage
+  // 2. GUARDADO AUTOMÁTICO
   useEffect(() => {
-    // Validación de seguridad para evitar errores con propiedades de objetos (.name)
     if (!states.selectedAccent?.name || !states.selectedFont?.name || !states.editorTheme?.name) return;
 
     const storageMap = {
@@ -97,10 +103,11 @@ export function usePersistence({
       'selected_font': states.selectedFont.name,
       'editor_theme': states.editorTheme.name,
       'font_size': states.fontSize,
-      'zen_mode': states.isZenMode.toString()
+      'zen_mode': states.isZenMode.toString(),
+      'recall_active': states.isRecallMode.toString(),
+      'blind_mode': states.isBlindMode.toString()
     };
 
-    // Iteramos para guardar de forma limpia
     Object.entries(storageMap).forEach(([key, value]) => {
       localStorage.setItem(key, value);
     });
