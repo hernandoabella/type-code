@@ -107,8 +107,6 @@ export const SNIPPETS: Snippet[] = [
   },
 ];
 
-
-
 export const LANG_ICONS: Record<string, JSX.Element> = {
   all: <VscCode className="text-zinc-400" />,
   javascript: <SiJavascript className="text-yellow-400" />,
