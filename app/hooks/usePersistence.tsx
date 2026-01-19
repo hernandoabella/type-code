@@ -76,15 +76,15 @@ export function usePersistence({
     
     // Rehidratación de objetos
     if (savedAccent) {
-      const found = ACCENTS.find(a => a.name === savedAccent);
+      const found = ACCENTS.find((a: { name: string; }) => a.name === savedAccent);
       if (found) setSelectedAccent(found);
     }
     if (savedFont) {
-      const found = FONTS.find(f => f.name === savedFont);
+      const found = FONTS.find((f: { name: string; }) => f.name === savedFont);
       if (found) setSelectedFont(found);
     }
     if (savedTheme) {
-      const found = HIGHLIGHT_THEMES.find(t => t.name === savedTheme);
+      const found = HIGHLIGHT_THEMES.find((t: { name: string; }) => t.name === savedTheme);
       if (found) setEditorTheme(found);
     }
   }, []);

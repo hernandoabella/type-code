@@ -6,7 +6,7 @@ import {
   VscMap 
 } from "react-icons/vsc";
 
-export const MODES_CONFIG = [
+export const MODES = [
   {
     id: "ghost",
     label: "Ghost",

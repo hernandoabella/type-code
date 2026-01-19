@@ -1,27 +1,13 @@
-
-
+import { Snippet } from "@/app/types";
 import { ReactNode } from "react";
-import { 
-  SiJavascript, 
-  SiTypescript, 
-  SiPython, 
-  SiReact 
+import {
+  SiJavascript,
+  SiTypescript,
+  SiPython,
+  SiReact
 } from "react-icons/si";
 
-export interface Snippet {
-  id: string;
-  title: string;
-  category: string;
-  lang: 'javascript' | 'typescript' | 'python';
-  level: 'beginner' | 'intermediate' | 'advanced';
-  tags: string[];
-  bestPractice?: boolean;
-  icon: ReactNode;
-  description: string;
-  realLifeUsage: string;
-  output: string;
-  code: string;
-}
+
 
 export const SNIPPETS: Snippet[] = [
   {
