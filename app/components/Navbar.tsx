@@ -7,7 +7,9 @@ import {
   VscTextSize,
   VscEye,      
   VscEyeClosed, 
-  VscTarget
+  VscTarget,
+  VscLock,    // Icono para Blind Mode ON
+   // Icono para Blind Mode OFF
 } from "react-icons/vsc";
 import { CustomSelect } from "./CustomSelect";
 import { ModeButton } from "./ModeButton";
@@ -36,6 +38,9 @@ interface NavbarProps {
   setIsZenMode: (val: boolean) => void;
   isRecallMode: boolean;
   setIsRecallMode: (val: boolean) => void;
+  // --- NUEVO PROP ---
+  isBlindMode: boolean;
+  setIsBlindMode: (val: boolean) => void;
 }
 
 export const Navbar = ({
@@ -61,14 +66,14 @@ export const Navbar = ({
   setIsZenMode,
   isRecallMode,
   setIsRecallMode,
+  isBlindMode,
+  setIsBlindMode,
 }: NavbarProps) => {
 
   return (
-    /* 1. Elevamos el z-index de todo el nav a 100 para superar la terminal */
     <nav className={`relative w-full z-[100] transition-all duration-1000 ${isZenMode ? "opacity-0 -translate-y-20 pointer-events-none" : "opacity-100 translate-y-0"}`}>
       
       {/* BARRA PRINCIPAL (TOP) */}
-      {/* 2. z-50 para que los CustomSelect se desplieguen por encima de la barra de modos inferior */}
       <div className="flex h-16 items-center justify-between px-8 bg-black/40 backdrop-blur-3xl border border-white/10 rounded-full shadow-2xl relative z-50">
         
         {/* IZQUIERDA: Brand */}
@@ -114,12 +119,13 @@ export const Navbar = ({
         </div>
       </div>
 
-      {/* BARRA INFERIOR (DOWN): Activaciones y Acentos */}
-      {/* 3. z-40 para que esté por encima de la terminal pero por debajo de la barra superior si hay colisión */}
+      {/* BARRA INFERIOR: Modos y Acentos */}
       <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 flex items-center gap-4 animate-in fade-in slide-in-from-top-2 duration-700 z-40">
         
         {/* PANEL DE MODOS */}
         <div className="flex items-center gap-1.5 p-1.5 bg-black/60 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-xl">
+          
+          {/* MODO RECALL (Especial - Morado) */}
           <ModeButton
             label="Recall"
             active={isRecallMode}
@@ -129,6 +135,17 @@ export const Navbar = ({
             activeClass="bg-purple-500/20 border-purple-500/50 text-purple-400"
           />
 
+          {/* MODO BLIND (Nuevo - Naranja) */}
+          <ModeButton
+            label="Blind"
+            active={isBlindMode}
+            onClick={() => setIsBlindMode(!isBlindMode)}
+            iconOn={VscLock}
+            iconOff={VscLock}
+            activeClass="bg-orange-500/20 border-orange-500/50 text-orange-400"
+          />
+
+          {/* RESTO DE MODOS (Ghost, Bot, etc) */}
           {MODES_CONFIG.map((mode) => {
             const isActive = mode.id === "ghost" ? isGhostActive : mode.id === "bot" ? autoWriting : autoPilot;
             const toggle = mode.id === "ghost" ? () => setIsGhostActive(!isGhostActive) : mode.id === "bot" ? () => setAutoWriting(!autoWriting) : () => setAutoPilot(!autoPilot);
