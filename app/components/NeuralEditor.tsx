@@ -14,6 +14,8 @@ interface UseNeuralEditorProps {
   isZenMode: boolean; 
   setIsZenMode: (val: boolean) => void;
   isRecallMode: boolean;
+  // --- NUEVA PROP ---
+  isBlindMode: boolean;
 }
 
 export function useNeuralEditor({
@@ -27,6 +29,7 @@ export function useNeuralEditor({
   isZenMode,
   setIsZenMode,
   isRecallMode,
+  isBlindMode, // Inyectamos Blind Mode
 }: UseNeuralEditorProps) {
   const [input, setInput] = useState("");
   const [isError, setIsError] = useState(false);
@@ -48,9 +51,17 @@ export function useNeuralEditor({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isZenMode, setIsZenMode]);
 
-  // --- LÓGICA DE MEMORY RECALL ---
+  // --- LÓGICA DE VISIBILIDAD (RECALL & BLIND) ---
   useEffect(() => {
-    if (isRecallMode && input.length === 1 && !autoWriting) {
+    // Blind Mode tiene prioridad: si está activo, ocultamos siempre el código guía
+    if (isBlindMode) {
+      setIsCodeVisible(false);
+      gsap.to(".source-code-layer", { opacity: 0, duration: 0.3 });
+      return;
+    }
+
+    // Lógica original de Recall Mode
+    if (isRecallMode && input.length >= 1 && !autoWriting) {
       gsap.to(".source-code-layer", {
         opacity: 0,
         filter: "blur(10px)",
@@ -69,7 +80,7 @@ export function useNeuralEditor({
         ease: "power2.in"
       });
     }
-  }, [isRecallMode, input.length, autoWriting]);
+  }, [isRecallMode, isBlindMode, input.length, autoWriting]);
 
   const MASTER_STYLE = useMemo(() => ({
     fontFamily: selectedFont.family,
@@ -92,12 +103,23 @@ export function useNeuralEditor({
       const currentIsError = val.split("").some((char, i) => char !== snippet.code[i]);
       setIsError(currentIsError);
 
+      // --- FEEDBACK DE ERROR MEJORADO ---
       if (val.length > input.length && val[val.length - 1] !== snippet.code[val.length - 1]) {
         if (terminalRef.current) {
+          // Vibración más intensa si es Blind Mode
+          const shakeIntensity = isBlindMode ? 8 : 4;
           gsap.fromTo(terminalRef.current, 
-            { x: -4 }, 
-            { x: 4, duration: 0.05, repeat: 3, yoyo: true, ease: "linear" }
+            { x: -shakeIntensity }, 
+            { x: shakeIntensity, duration: 0.05, repeat: isBlindMode ? 5 : 3, yoyo: true, ease: "linear" }
           );
+
+          // Flash rojo en el terminal si es Blind Mode para avisar del error
+          if (isBlindMode) {
+            gsap.fromTo(terminalRef.current, 
+              { borderColor: "rgba(239, 68, 68, 0.5)" }, 
+              { borderColor: "rgba(255, 255, 255, 0.1)", duration: 0.4 }
+            );
+          }
         }
       }
 
@@ -108,22 +130,18 @@ export function useNeuralEditor({
         if (timerRef.current) clearInterval(timerRef.current);
       }
     },
-    [finished, snippet, startTime, input.length, terminalRef]
+    [finished, snippet, startTime, input.length, terminalRef, isBlindMode]
   );
 
-  // --- FIX: BOT AUTO-WRITE (REACTIVO) ---
+  // --- BOT AUTO-WRITE ---
   useEffect(() => {
-    // 1. Limpiar siempre al cambiar estados
     if (autoWriteInterval.current) {
       clearInterval(autoWriteInterval.current);
       autoWriteInterval.current = null;
     }
 
-    // 2. Solo arrancar si autoWriting es true y no hemos terminado
     if (autoWriting && !finished && snippet) {
-      // Sincronizamos el índice con lo que ya esté escrito
       let currentIndex = input.length;
-
       autoWriteInterval.current = setInterval(() => {
         if (currentIndex < snippet.code.length) {
           currentIndex++;
@@ -138,8 +156,6 @@ export function useNeuralEditor({
     return () => {
       if (autoWriteInterval.current) clearInterval(autoWriteInterval.current);
     };
-    // Añadimos input.length para que si el usuario escribe manualmente, 
-    // el bot sepa retomar desde la nueva posición al activarse
   }, [autoWriting, finished, snippet.code, botSpeed, handleInput, input.length]);
 
   const resetCurrentSnippet = useCallback(() => {
@@ -154,7 +170,7 @@ export function useNeuralEditor({
     setTimeout(() => textareaRef.current?.focus(), 50);
   }, [textareaRef]);
 
-  // Timer & WPM logic...
+  // Timer & WPM logic
   useEffect(() => {
     if (startTime && !finished) {
       timerRef.current = setInterval(() => setTimeElapsed(Date.now() - startTime), 100);
