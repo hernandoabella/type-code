@@ -74,7 +74,6 @@ export const Navbar = ({
         {/* IZQUIERDA: Brand */}
         <div className="flex items-center gap-6">
           <div className="flex flex-col -space-y-1">
-            <span className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30 ml-1">Neural</span>
             <span className="text-xl font-black text-white tracking-tighter italic">
               Type<span className={`${accent.class} drop-shadow-[0_0_8px_currentColor]`}>Code</span>
             </span>
