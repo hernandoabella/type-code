@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import gsap from "gsap";
 
 interface UseNeuralEditorProps {
-  snippet: { id: string; code: string; lang: string };
+  snippet: { code: string; lang: string };
   autoWriting: boolean;
   botSpeed: number;
   fontSize: string;
@@ -15,8 +15,8 @@ interface UseNeuralEditorProps {
   setIsZenMode: (val: boolean) => void;
   isRecallMode: boolean;
   isBlindMode: boolean;
-  // --- NUEVA PROP ---
   isHardcoreMode: boolean;
+  isPrecisionMode: boolean;
 }
 
 export function useNeuralEditor({
@@ -32,7 +32,9 @@ export function useNeuralEditor({
   isRecallMode,
   isBlindMode,
   isHardcoreMode,
+  isPrecisionMode,
 }: UseNeuralEditorProps) {
+  // --- ESTADOS PRINCIPALES ---
   const [input, setInput] = useState("");
   const [isError, setIsError] = useState(false);
   const [finished, setFinished] = useState(false);
@@ -40,168 +42,173 @@ export function useNeuralEditor({
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [wpm, setWpm] = useState(0);
   const [accuracy, setAccuracy] = useState(100);
-  const [isCodeVisible, setIsCodeVisible] = useState(true);
 
-  const autoWriteInterval = useRef<NodeJS.Timeout | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  // --- REFERENCIAS DE CONTROL ---
   const totalKeystrokes = useRef(0);
   const errorCount = useRef(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoWriteInterval = useRef<NodeJS.Timeout | null>(null);
 
-  // --- AUTO-FOCUS ---
-  useEffect(() => {
-    const focusTimeout = setTimeout(() => textareaRef.current?.focus(), 500);
-    return () => clearTimeout(focusTimeout);
-  }, [snippet.id, textareaRef]);
+  // --- LÓGICA DE RANGOS (PRECISION MODE) ---
+  const rank = useMemo(() => {
+    if (!finished) return null;
+    if (accuracy === 100) return { id: "S", label: "PERFECT", color: "text-yellow-400", bg: "bg-yellow-400/10", border: "border-yellow-400/50" };
+    if (accuracy >= 95) return { id: "A", label: "ELITE", color: "text-blue-400", bg: "bg-blue-400/10", border: "border-blue-400/50" };
+    if (accuracy >= 85) return { id: "B", label: "SENIOR", color: "text-green-400", bg: "bg-green-400/10", border: "border-green-400/50" };
+    return { id: "C", label: "JUNIOR", color: "text-zinc-500", bg: "bg-zinc-500/10", border: "border-zinc-500/50" };
+  }, [finished, accuracy]);
 
-  // --- MANEJO DE TECLAS (TAB + BACKSPACE + ESCAPE) ---
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (autoWriting || finished) return;
-
-    // 1. ESCAPE (Zen Mode)
-    if (e.key === "Escape" && isZenMode) setIsZenMode(false);
-
-    // 2. ALT + R (Reset)
-    if (e.altKey && e.key === "r") resetCurrentSnippet();
-
-    // 3. TAB (Insertar espacios)
-    if (e.key === "Tab") {
-      e.preventDefault();
-      const { selectionStart, selectionEnd } = e.currentTarget;
-      const tabSpaces = "    ";
-      const newValue = input.substring(0, selectionStart) + tabSpaces + input.substring(selectionEnd);
-      handleInput(newValue);
-      
-      // Reposicionar cursor tras el render
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.selectionStart = textareaRef.current.selectionEnd = selectionStart + tabSpaces.length;
-        }
-      }, 0);
-    }
-
-    // 4. HARDCORE MODE: Bloquear Backspace
-    if (isHardcoreMode && e.key === "Backspace") {
-      e.preventDefault();
-      gsap.to(terminalRef.current, { x: -2, duration: 0.05, repeat: 1, yoyo: true });
-    }
-  }, [input, autoWriting, finished, isZenMode, isHardcoreMode, setIsZenMode]);
-
-  // --- LÓGICA DE VISIBILIDAD GSAP ---
-  useEffect(() => {
-    const layer = ".source-code-layer";
-    if (isBlindMode) {
-      setIsCodeVisible(false);
-      gsap.to(layer, { opacity: 0, filter: "blur(20px)", duration: 0.5 });
-      return;
-    }
-    if (isRecallMode && input.length >= 1 && !autoWriting) {
-      gsap.to(layer, { opacity: 0, filter: "blur(12px)", y: -10, duration: 0.8, onComplete: () => setIsCodeVisible(false) });
-    } else {
-      setIsCodeVisible(true);
-      gsap.to(layer, { opacity: 1, filter: "blur(0px)", y: 0, duration: 0.4 });
-    }
-  }, [isRecallMode, isBlindMode, input.length, autoWriting]);
-
-  // --- HANDLER DE ENTRADA PRINCIPAL ---
-  const handleInput = useCallback(
-    (val: string) => {
-      if (finished || !snippet || val.length > snippet.code.length) return;
-      if (!startTime && val.length > 0) setStartTime(Date.now());
-      
-      // Lógica de validación
-      if (val.length > input.length) {
-        totalKeystrokes.current += 1;
-        const lastCharIdx = val.length - 1;
-        const isCharError = val[lastCharIdx] !== snippet.code[lastCharIdx];
-
-        if (isCharError) {
-          errorCount.current += 1;
-          
-          // --- EFECTO HARDCORE: RESET AL FALLAR ---
-          if (isHardcoreMode) {
-            gsap.to(terminalRef.current, { 
-              backgroundColor: "rgba(239, 68, 68, 0.2)",
-              x: 15,
-              duration: 0.08,
-              repeat: 3,
-              yoyo: true,
-              onComplete: resetCurrentSnippet 
-            });
-            return; // Bloqueamos el setInput
-          }
-
-          // Feedback visual normal
-          if (terminalRef.current) {
-            const intensity = isBlindMode ? 10 : 4;
-            gsap.fromTo(terminalRef.current, { x: -intensity }, { x: intensity, duration: 0.05, repeat: 3, yoyo: true });
-          }
-        }
-        
-        // Calcular precisión real
-        setAccuracy(Math.max(0, Math.round(((totalKeystrokes.current - errorCount.current) / totalKeystrokes.current) * 100)));
-      }
-
-      const currentIsError = val.split("").some((char, i) => char !== snippet.code[i]);
-      setIsError(currentIsError);
-      setInput(val);
-      
-      if (val === snippet.code && !currentIsError) {
-        setFinished(true);
-        if (autoWriteInterval.current) clearInterval(autoWriteInterval.current);
-        if (timerRef.current) clearInterval(timerRef.current);
-        gsap.to(terminalRef.current, { scale: 1.02, borderColor: "rgba(34, 197, 94, 0.5)", duration: 0.4 });
-      }
-    },
-    [finished, snippet, startTime, input, isHardcoreMode, isBlindMode, terminalRef]
-  );
-
-  // --- BOT ENGINE ---
-  useEffect(() => {
-    if (autoWriteInterval.current) clearInterval(autoWriteInterval.current);
-    if (autoWriting && !finished && snippet) {
-      let currentIndex = input.length;
-      autoWriteInterval.current = setInterval(() => {
-        if (currentIndex < snippet.code.length) {
-          currentIndex++;
-          handleInput(snippet.code.slice(0, currentIndex));
-        } else {
-          clearInterval(autoWriteInterval.current!);
-        }
-      }, botSpeed);
-    }
-    return () => { if (autoWriteInterval.current) clearInterval(autoWriteInterval.current); };
-  }, [autoWriting, finished, snippet.code, botSpeed, handleInput, input.length]);
-
+  // --- HELPERS ---
   const resetCurrentSnippet = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (autoWriteInterval.current) clearInterval(autoWriteInterval.current);
+    
     setInput("");
     setFinished(false);
     setStartTime(null);
     setTimeElapsed(0);
     setWpm(0);
     setAccuracy(100);
-    errorCount.current = 0;
-    totalKeystrokes.current = 0;
     setIsError(false);
-    gsap.fromTo(terminalRef.current, { opacity: 0 }, { opacity: 1, duration: 0.4 });
+    totalKeystrokes.current = 0;
+    errorCount.current = 0;
+    
+    // Reset visual de la terminal
+    gsap.to(terminalRef.current, { 
+      x: 0, 
+      scale: 1, 
+      borderColor: "rgba(255, 255, 255, 0.1)", 
+      boxShadow: "none", 
+      duration: 0.3,
+      backgroundColor: "transparent"
+    });
+
     setTimeout(() => textareaRef.current?.focus(), 50);
   }, [textareaRef, terminalRef]);
 
-  // Timer & WPM
+  // --- CORE INPUT HANDLER ---
+  const handleInput = useCallback((val: string) => {
+    if (finished || !snippet || val.length > snippet.code.length) return;
+    
+    // Iniciar timer en la primera pulsación
+    if (!startTime && val.length > 0) setStartTime(Date.now());
+
+    // PROCESAMIENTO DE PULSACIONES (Para Accuracy)
+    if (val.length > input.length) {
+      totalKeystrokes.current += 1;
+      const lastIdx = val.length - 1;
+      const isCharWrong = val[lastIdx] !== snippet.code[lastIdx];
+
+      if (isCharWrong) {
+        errorCount.current += 1;
+        
+        // Efecto visual de error (Shake + Color)
+        const intensity = isBlindMode ? 12 : 4;
+        gsap.fromTo(terminalRef.current, 
+          { x: -intensity, borderColor: "rgba(239, 68, 68, 0.8)" }, 
+          { x: intensity, borderColor: "rgba(255, 255, 255, 0.1)", duration: 0.05, repeat: isBlindMode ? 5 : 3, yoyo: true }
+        );
+
+        // HARDCORE MODE: Reset instantáneo al fallar
+        if (isHardcoreMode) {
+          gsap.to(terminalRef.current, { backgroundColor: "rgba(239, 68, 68, 0.15)", duration: 0.1 });
+          resetCurrentSnippet();
+          return;
+        }
+      }
+      
+      // Cálculo de precisión real (No se recupera borrando)
+      const currentAcc = Math.round(((totalKeystrokes.current - errorCount.current) / totalKeystrokes.current) * 100);
+      setAccuracy(currentAcc > 0 ? currentAcc : 0);
+    }
+
+    const currentIsError = val.split("").some((char, i) => char !== snippet.code[i]);
+    setIsError(currentIsError);
+    setInput(val);
+
+    // LÓGICA DE FINALIZACIÓN
+    if (val === snippet.code && !currentIsError) {
+      setFinished(true);
+      if (timerRef.current) clearInterval(timerRef.current);
+      
+      // Bonus visual por carrera perfecta
+      if (isPrecisionMode && accuracy === 100) {
+        gsap.to(terminalRef.current, { 
+          boxShadow: "0 0 50px rgba(250, 204, 21, 0.3)", 
+          borderColor: "#facb15", 
+          scale: 1.02,
+          duration: 0.8,
+          ease: "elastic.out(1, 0.3)" 
+        });
+      }
+    }
+  }, [finished, snippet, startTime, input, isHardcoreMode, isBlindMode, isPrecisionMode, accuracy, terminalRef, resetCurrentSnippet]);
+
+  // --- MANEJO DE TECLAS ESPECIALES ---
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (autoWriting || finished) return;
+
+    // 1. Salir de Zen Mode
+    if (e.key === "Escape" && isZenMode) setIsZenMode(false);
+
+    // 2. Soporte para TAB (4 espacios)
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const { selectionStart, selectionEnd } = e.currentTarget;
+      const spaces = "    ";
+      const newValue = input.substring(0, selectionStart) + spaces + input.substring(selectionEnd);
+      
+      handleInput(newValue);
+
+      // Reposicionar cursor
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.selectionStart = textareaRef.current.selectionEnd = selectionStart + spaces.length;
+        }
+      }, 0);
+    }
+
+    // 3. HARDCORE MODE: Bloquear Backspace
+    if (isHardcoreMode && e.key === "Backspace") {
+      e.preventDefault();
+      gsap.to(terminalRef.current, { x: -2, duration: 0.05, repeat: 1, yoyo: true });
+    }
+  }, [input, autoWriting, finished, isZenMode, isHardcoreMode, setIsZenMode, handleInput]);
+
+  // --- EFECTOS DE TIEMPO Y WPM ---
   useEffect(() => {
     if (startTime && !finished) {
       timerRef.current = setInterval(() => setTimeElapsed(Date.now() - startTime), 100);
-    } else if (timerRef.current) clearInterval(timerRef.current);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [startTime, finished]);
 
   useEffect(() => {
-    if (startTime && input.length > 2 && !finished) {
+    if (startTime && input.length > 5 && !finished) {
       const minutes = (Date.now() - startTime) / 60000;
-      setWpm(Math.round((input.length / 5) / minutes) || 0);
+      const currentWpm = Math.round((input.length / 5) / minutes);
+      setWpm(currentWpm > 0 ? currentWpm : 0);
     }
   }, [input.length, startTime, finished]);
+
+  // --- VISIBILIDAD DE CAPAS (RECALL & BLIND) ---
+  const isCodeVisible = useMemo(() => {
+    if (isBlindMode) return false;
+    if (isRecallMode && input.length > 0) return false;
+    return true;
+  }, [isBlindMode, isRecallMode, input.length]);
+
+  // --- ESTILOS MAESTROS ---
+  const MASTER_STYLE = useMemo(() => ({
+    fontFamily: selectedFont.family,
+    fontSize: fontSize,
+    lineHeight: "1.7",
+    fontWeight: 700,
+    tabSize: 4,
+    transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)", 
+  }), [selectedFont, fontSize]);
 
   const formatTime = (ms: number) => {
     const s = Math.floor(ms / 1000) % 60;
@@ -209,19 +216,21 @@ export function useNeuralEditor({
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  const MASTER_STYLE = useMemo(() => ({
-    fontFamily: selectedFont.family,
-    fontSize,
-    lineHeight: "1.7",
-    fontWeight: 700,
-    tabSize: 4,
-    transition: "font-size 0.3s ease", 
-  }), [selectedFont, fontSize]);
-
   return {
-    input, isError, finished, timeElapsed, wpm, accuracy,
+    input,
+    isError,
+    finished,
+    timeElapsed,
+    wpm,
+    accuracy,
+    rank,
     isFocusMode: (input.length > 0 || autoWriting || isZenMode) && !finished,
-    isCodeVisible, MASTER_STYLE, handleInput, handleKeyDown, // Exportamos handleKeyDown
-    resetCurrentSnippet, formatTime, setStartTime,
+    isCodeVisible,
+    MASTER_STYLE,
+    handleInput,
+    handleKeyDown,
+    resetCurrentSnippet,
+    formatTime,
+    setStartTime,
   };
 }

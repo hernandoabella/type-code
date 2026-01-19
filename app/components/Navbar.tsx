@@ -8,8 +8,8 @@ import {
   VscEyeClosed, 
   VscTarget,
   VscLock,
-  VscFlame,     // Icono para Hardcore Mode ON
-  VscHistory    // Icono opcional para Hardcore Mode OFF o Reset
+  VscFlame,
+  VscCheckAll, // Icono para Precision Mode
 } from "react-icons/vsc";
 import { CustomSelect } from "./CustomSelect";
 import { ModeButton } from "./ModeButton";
@@ -40,9 +40,11 @@ interface NavbarProps {
   setIsRecallMode: (val: boolean) => void;
   isBlindMode: boolean;
   setIsBlindMode: (val: boolean) => void;
-  // --- NUEVAS PROPS HARDCORE ---
   isHardcoreMode: boolean;
   setIsHardcoreMode: (val: boolean) => void;
+  // --- NUEVAS PROPS PRECISION ---
+  isPrecisionMode: boolean;
+  setIsPrecisionMode: (val: boolean) => void;
 }
 
 export const Navbar = ({
@@ -72,6 +74,8 @@ export const Navbar = ({
   setIsBlindMode,
   isHardcoreMode,
   setIsHardcoreMode,
+  isPrecisionMode,
+  setIsPrecisionMode,
 }: NavbarProps) => {
 
   return (
@@ -129,7 +133,17 @@ export const Navbar = ({
         {/* PANEL DE MODOS */}
         <div className="flex items-center gap-1.5 p-1.5 bg-black/60 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-xl">
           
-          {/* MODO HARDCORE (Especial - Rojo Brillante) */}
+          {/* MODO PRECISION (Nuevo - Amarillo/Oro) */}
+          <ModeButton
+            label="Precision"
+            active={isPrecisionMode}
+            onClick={() => setIsPrecisionMode(!isPrecisionMode)}
+            iconOn={VscCheckAll}
+            iconOff={VscCheckAll}
+            activeClass="bg-yellow-500/20 border-yellow-500/50 text-yellow-500 shadow-[0_0_15px_rgba(250,204,21,0.2)]"
+          />
+
+          {/* MODO HARDCORE (Rojo Brillante) */}
           <ModeButton
             label="Hardcore"
             active={isHardcoreMode}
