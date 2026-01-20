@@ -1,52 +1,41 @@
-import { VscTerminal } from "react-icons/vsc";
-
 interface LogoProps {
   accent: {
-    class: string;
-    bg: string;
+    class: string; // Ejemplo: "text-blue-400"
+    bg: string;    // Ejemplo: "bg-blue-400"
   };
 }
 
 const Logo = ({ accent }: LogoProps) => {
   return (
-    <div className="group flex items-center gap-3 px-2 cursor-default select-none">
-      
-      {/* Icono */}
-      <div className="relative flex items-center justify-center">
-        {/* Glow radial */}
-        <div
-          className={`absolute -inset-2 rounded-full ${accent.bg} blur-xl opacity-20 
-          group-hover:opacity-50 transition-all duration-700`}
-        />
+    <div 
+      className="flex items-center px-4 cursor-default group" 
+      role="banner"
+      aria-label="TypeCode Logo"
+    >
+      <div className="flex flex-col relative">
+        <h1 className="text-[16px] font-black uppercase tracking-[0.3em] text-white leading-none select-none flex items-center">
+          {/* Parte fija */}
+          <span className="opacity-90">Type</span>
+          
+          {/* Parte resaltada: El "Code" ahora tiene un fondo dinámico */}
+          <span className={`
+            relative ml-2 px-2 py-1 rounded-lg
+            ${accent.class} transition-all duration-500 ease-in-out
+            group-hover:scale-105
+          `}>
+            {/* Fondo suave con el acento actual */}
+            <div className={`absolute inset-0 ${accent.bg} opacity-10 rounded-lg group-hover:opacity-20 transition-opacity`} />
+            
+            <span className="relative">Code</span>
+          </span>
+        </h1>
 
-        <VscTerminal
-          size={26}
-          className={`
-            relative ${accent.class}
-            transition-all duration-700 ease-out
-            group-hover:scale-110
-            group-hover:-rotate-6
-          `}
-        />
-      </div>
-
-      {/* Texto */}
-      <div className="flex flex-col leading-none">
-        <span className="text-[13px] font-extrabold uppercase tracking-[0.3em] text-white">
-          Type
-          <span className={`ml-1 ${accent.class}`}>Code</span>
-        </span>
-
-        {/* Línea decorativa */}
-        <div className="relative mt-1 h-[1px] w-full overflow-hidden">
-          <div
-            className={`
-              absolute left-0 top-0 h-full w-0
-              ${accent.bg} opacity-60
-              group-hover:w-full
-              transition-all duration-700 ease-out
-            `}
-          />
+        {/* Línea decorativa inferior que brilla con el acento */}
+        <div className="absolute -bottom-2 left-0 w-full h-[2px] overflow-hidden rounded-full">
+          <div className={`
+            h-full w-0 group-hover:w-full transition-all duration-700 
+            ease-out ${accent.bg} opacity-50
+          `} />
         </div>
       </div>
     </div>
