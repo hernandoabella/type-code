@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useEffect } from "react";
-import { VscTarget, VscRefresh } from "react-icons/vsc";
+import { useState } from "react";
+import { VscTarget, VscRefresh, VscSettingsGear, VscClose } from "react-icons/vsc";
 import Logo from "./Logo";
 import Selectors from "./Selectors";
 import FontSize from "./FontSize";
@@ -9,104 +9,103 @@ import ModesMenu from "./ModesMenu";
 import { Accents } from "./Accents";
 
 export const Navbar = (props: any) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Extraemos las funciones de props para mayor claridad y evitar errores de undefined
-  const { 
-    resetCurrentSnippet, 
-    isZenMode, 
-    setIsZenMode, 
-    accent,
-    langFilter,
-    languages,
-    setLangFilter,
-    selectedFont,
-    setSelectedFont,
-    editorTheme,
-    setEditorTheme,
-    fontSize,
-    setFontSize,
-    setSelectedAccent
-  } = props;
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isZenMode) {
-        setIsZenMode(false);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isZenMode, setIsZenMode]);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { accent, isZenMode, setIsZenMode, resetCurrentSnippet } = props;
 
   return (
-    <nav 
-      ref={containerRef}
-      className={`fixed top-6 left-1/2 -translate-x-1/2 z-[200] transition-all duration-700 
-        ${isZenMode ? "opacity-0 -translate-y-10 pointer-events-none" : "opacity-100 translate-y-0"}`}
-    >
-      <div className="flex h-16 items-center gap-2 px-5 bg-[#080808]/90 backdrop-blur-3xl border border-white/10 rounded-[1.8rem] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]">
+    <>
+      <nav className={`fixed top-4 md:top-6 left-1/2 -translate-x-1/2 z-[200] transition-all duration-700 
+        ${isZenMode ? "opacity-0 -translate-y-10 pointer-events-none" : "opacity-100 translate-y-0"}`}>
         
-        <Logo accent={accent} />
-        <div className="h-8 w-px bg-white/10 mx-2" />
+        <div className="flex h-12 md:h-16 items-center gap-1 md:gap-2 px-2 md:px-5 bg-[#080808]/90 backdrop-blur-3xl border border-white/10 rounded-full md:rounded-[1.8rem] shadow-2xl transition-all duration-500">
+          
+          {/* NÚCLEO IZQUIERDO: Logo siempre presente */}
+          <div className="scale-90 md:scale-100">
+            <Logo accent={accent} />
+          </div>
+          
+          {/* Separador: Desaparece en móviles muy pequeños */}
+          <div className="hidden sm:block h-6 md:h-8 w-px bg-white/10 mx-1" />
 
-        <Selectors 
-          langFilter={langFilter}
-          languages={languages}
-          setLangFilter={setLangFilter}
-          selectedFont={selectedFont}
-          setSelectedFont={setSelectedFont}
-          editorTheme={editorTheme}
-          setEditorTheme={setEditorTheme}
-        />
+          {/* ZONA DE CONTROL DINÁMICA */}
+          <div className="flex items-center">
+            {/* Escritorio: Selectores completos */}
+            <div className="hidden lg:flex items-center gap-2">
+              <Selectors {...props} />
+              <FontSize {...props} />
+              <div className="h-8 w-px bg-white/10 mx-2" />
+            </div>
 
-        <FontSize 
-          fontSize={fontSize} 
-          setFontSize={setFontSize} 
-          accent={accent}
-        />
+            {/* Modos: En móvil solo el icono, en desktop texto + icono */}
+            <ModesMenu {...props} />
+          </div>
 
-        <div className="h-8 w-px bg-white/10 mx-2" />
-        
-        {/* Pasamos props individualmente o extendemos para que ModesMenu las reciba bien */}
-        <ModesMenu {...props} />
+          <div className="h-6 md:h-8 w-px bg-white/10 mx-1 md:mx-2" />
 
-        <Accents 
-          currentAccent={accent} 
-          setAccent={setSelectedAccent} 
-        />
+          {/* ACCIONES FINALES */}
+          <div className="flex items-center gap-0.5 md:gap-1">
+            {/* Reset: Compacto en móvil */}
+            <button 
+              onClick={() => window.confirm("¿Reset?") && resetCurrentSnippet?.()}
+              className="p-2 md:p-3 rounded-full md:rounded-xl hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-all"
+            >
+              <VscRefresh size={18} className="md:size-5" />
+            </button>
 
-        <div className="h-8 w-px bg-white/10 mx-2" />
+            {/* Ajustes: El salvavidas de los elementos eliminados */}
+            <button 
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="lg:hidden p-2 md:p-3 rounded-full bg-white/5 text-zinc-400 hover:text-white transition-all"
+            >
+              {isMobileMenuOpen ? <VscClose size={18} /> : <VscSettingsGear size={18} />}
+            </button>
 
-        <div className="flex items-center gap-1">
-          {/* BOTÓN MASTERY RESET: Ahora sí encontrará la función */}
-          <button 
-            onClick={() => {
-              if (window.confirm("¿Reiniciar progreso de la secuencia actual?")) {
-                if (typeof resetCurrentSnippet === 'function') {
-                  resetCurrentSnippet();
-                }
-              }
-            }} 
-            className="group relative p-3 rounded-xl hover:bg-red-500/5 transition-all"
-            title="Reset Sequence Progress"
-          >
-            <VscRefresh 
-              size={20} 
-              className="text-zinc-500 group-hover:text-red-400 group-hover:rotate-[-180deg] transition-all duration-500" 
-            />
-          </button>
-
-          <button 
-            onClick={() => setIsZenMode(true)} 
-            className="group relative p-3 rounded-xl hover:bg-white/5 transition-all"
-            title="Enter Zen Mode (Press ESC to exit)"
-          >
-            <VscTarget size={22} className="text-zinc-500 group-hover:text-white group-hover:rotate-90 group-hover:scale-110 transition-all duration-500" />
-            <div className={`absolute inset-0 ${accent.bg} blur-xl opacity-0 group-hover:opacity-20 transition-opacity`} />
-          </button>
+            {/* Zen Mode: Solo visible si hay espacio (Tablet en adelante) */}
+            <button 
+              onClick={() => setIsZenMode(true)}
+              className="hidden md:flex p-3 rounded-xl hover:bg-white/5 text-zinc-500 hover:text-white transition-all"
+            >
+              <VscTarget size={20} />
+            </button>
+          </div>
         </div>
-      </div>
-    </nav>
+
+        {/* PANEL DE EXTRACCIÓN (Mobile/Tablet Settings) */}
+        <div className={`absolute top-16 md:top-20 left-1/2 -translate-x-1/2 w-[90vw] max-w-xs p-5 bg-[#0a0a0a]/95 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] shadow-[0_40px_80px_rgba(0,0,0,0.8)] transition-all duration-500 lg:hidden ${
+          isMobileMenuOpen ? "opacity-100 translate-y-0 scale-100" : "opacity-0 -translate-y-10 scale-90 pointer-events-none"
+        }`}>
+          <div className="space-y-6">
+            <div className="flex justify-between items-center border-b border-white/5 pb-4">
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600">Core Engine</span>
+              <Accents currentAccent={accent} setAccent={props.setSelectedAccent} />
+            </div>
+            
+            <div className="flex flex-col gap-5">
+              <div className="space-y-2">
+                <span className="text-[9px] font-bold text-zinc-500 uppercase ml-2">Environment</span>
+                <Selectors {...props} />
+              </div>
+              
+              <div className="space-y-2">
+                <span className="text-[9px] font-bold text-zinc-500 uppercase ml-2">Typography</span>
+                <FontSize {...props} />
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setIsZenMode(true)}
+              className="w-full py-4 bg-white/5 rounded-2xl flex items-center justify-center gap-3 text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-white transition-all"
+            >
+              <VscTarget size={18} /> Zen Mode
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Backdrop de cierre */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-[190] bg-black/60 backdrop-blur-sm lg:hidden" onClick={() => setIsMobileMenuOpen(false)} />
+      )}
+    </>
   );
 };

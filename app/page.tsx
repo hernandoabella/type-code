@@ -6,7 +6,6 @@ import {
   VscChevronLeft, 
   VscChevronRight, 
   VscRefresh, 
-  VscTrash
 } from "react-icons/vsc";
 import gsap from "gsap";
 
@@ -37,22 +36,21 @@ export default function NeuralSyncMaster() {
   const [selectedAccent, setSelectedAccent] = useState(ACCENTS[0]);
   const [selectedFont, setSelectedFont] = useState(FONTS[0]);
   const [editorTheme, setEditorTheme] = useState(HIGHLIGHT_THEMES[0]);
-  const [fontSize, setFontSize] = useState("19px");
+  const [fontSize, setFontSize] = useState("16px");
   const [isError, setIsError] = useState(false);
   const [langFilter, setLangFilter] = useState("all");
   const [level, setLevel] = useState(0);
   const [input, setInput] = useState("");
   const [finished, setFinished] = useState(false);
-  const [autoPilot, setAutoPilot] = useState(true);
+  const [autoPilot, setAutoPilot] = useState(false);
   const [autoWriting, setAutoWriting] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
   const [isTimeActive, setIsTimeActive] = useState(true);
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [wpm, setWpm] = useState(0);
-  const [isGhostActive, setIsGhostActive] = useState(true);
+  const [isGhostActive, setIsGhostActive] = useState(false);
   const [isRecallMode, setIsRecallMode] = useState(false);
-
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
   const autoWriteInterval = useRef<NodeJS.Timeout | null>(null);
@@ -65,15 +63,6 @@ export default function NeuralSyncMaster() {
   const accent = isError ? { class: "text-red-500", bg: "bg-red-500", shadow: "shadow-red-500/40" } : selectedAccent;
 
   // --- LÓGICA DE RESET TOTAL ---
-  const resetAllProgress = useCallback(() => {
-    if (confirm("¿Estás seguro de que quieres reiniciar todo tu progreso?")) {
-      localStorage.clear();
-      setLevel(0);
-      setLangFilter("all");
-      resetCurrentSnippet();
-      window.location.reload(); // Recarga para asegurar estado limpio
-    }
-  }, []);
 
   useEffect(() => {
     const handleGlobalEsc = (e: KeyboardEvent) => {
@@ -116,20 +105,60 @@ export default function NeuralSyncMaster() {
   }), [selectedFont, fontSize]);
 
   const handleInput = useCallback((val: string) => {
-    if (finished || !snippet || val.length > snippet.code.length) return;
-    if (!startTime && val.length > 0) setStartTime(Date.now());
-    const currentIsError = val.split("").some((char, i) => char !== snippet.code[i]);
-    setIsError(currentIsError);
-    if (val.length > input.length && val[val.length - 1] !== snippet.code[val.length - 1]) {
-      gsap.fromTo(terminalRef.current, { x: -3 }, { x: 3, duration: 0.04, repeat: 3, yoyo: true });
+  // 1. Guard Rails: Si ya terminamos, no hay snippet o nos pasamos del código, abortamos.
+  if (finished || !snippet || val.length > snippet.code.length) return;
+
+  // 2. Telemetría: Iniciar cronómetro al primer impacto.
+  if (!startTime && val.length > 0) setStartTime(Date.now());
+
+  const lastCharIndex = val.length - 1;
+  const isDeletion = val.length < input.length;
+  
+  // 3. Validación de Error Quirúrgica: 
+  // En lugar de hacer split("").some(...) que es O(n) en cada tecla, 
+  // comparamos solo el último carácter (O(1)) para el feedback inmediato.
+  const isWrongChar = !isDeletion && val[lastCharIndex] !== snippet.code[lastCharIndex];
+  
+  // 4. Feedback Háptico Visual (GSAP):
+  if (isWrongChar) {
+    setIsError(true);
+    // Sacudida de error (Shake)
+    gsap.fromTo(terminalRef.current, 
+      { x: -4, filter: "brightness(1.5) sepia(1) saturate(5) hue-rotate(-50deg)" }, 
+      { x: 0, filter: "brightness(1) sepia(0) saturate(1) hue-rotate(0deg)", 
+        duration: 0.1, ease: "rough", clearProps: "all" }
+    );
+  } else {
+    // Si no hay error en el último caracter, verificamos si el estado general ya es limpio
+    // (Por si el usuario borró el error)
+    const hasExistingErrors = val.split("").some((char, i) => char !== snippet.code[i]);
+    setIsError(hasExistingErrors);
+  }
+
+  // 5. Update State
+  setInput(val);
+
+  // 6. Condición de Victoria: Sincronización completa.
+  if (val === snippet.code) {
+    setFinished(true);
+    
+    // Limpieza de hilos
+    if (autoWriteInterval.current) {
+      clearInterval(autoWriteInterval.current);
+      autoWriteInterval.current = null;
     }
-    setInput(val);
-    if (val === snippet.code && !currentIsError) {
-      setFinished(true);
-      if (autoWriteInterval.current) { clearInterval(autoWriteInterval.current); autoWriteInterval.current = null; }
-      if (timerRef.current) clearInterval(timerRef.current);
-    }
-  }, [finished, snippet, startTime, input.length]);
+    if (timerRef.current) clearInterval(timerRef.current);
+
+    // Animación de Éxito: Destello del acento
+    gsap.to(terminalRef.current, {
+      boxShadow: `0 0 100px -10px ${accent?.shadow || 'rgba(255,255,255,0.2)'}`,
+      duration: 0.6,
+      yoyo: true,
+      repeat: 1,
+      ease: "power2.out"
+    });
+  }
+}, [finished, snippet, startTime, input.length, accent]);
 
   const resetCurrentSnippet = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -299,7 +328,7 @@ useEffect(() => {
           isZenMode={isZenMode}
           setIsZenMode={setIsZenMode}
           isRecallMode={isRecallMode}
-          setIsRecallMode={setIsRecallMode} isBlindMode={false} setIsBlindMode={function (val: boolean): void {
+          setIsRecallMode={setIsRecallMode} isBlindMode={false} setIsBlindMode={function (): void {
             throw new Error("Function not implemented.");
           } }        />
 
