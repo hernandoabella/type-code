@@ -390,38 +390,47 @@ function LevelUpOverlay({ level, color, onDone }: { level:number; color:string; 
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const t = setTimeout(() => {
-      ref.current?.classList.remove("levelup-in");
-      ref.current?.classList.add("levelup-out");
-      setTimeout(onDone, 400);
-    }, 1000);
+      if (ref.current) {
+        ref.current.style.transition = "opacity 0.4s ease-out, transform 0.4s ease-out";
+        ref.current.style.opacity = "0";
+        ref.current.style.transform = "translateY(-16px) scale(0.95)";
+      }
+      setTimeout(onDone, 420);
+    }, 3000);
     return () => clearTimeout(t);
   }, [onDone]);
   return (
-    <div
-      className="fixed inset-0 z-[500] flex items-center justify-center pointer-events-none"
-      style={{ background:`radial-gradient(ellipse 55% 45% at 50% 50%, ${color}18 0%, rgba(3,3,5,0.82) 70%)`, backdropFilter:"blur(6px)" }}
-    >
+    <div className="fixed top-24 right-6 z-[500] flex items-center pointer-events-none">
       <div
         ref={ref}
-        className="levelup-in flex flex-col items-center gap-2 px-16 py-10 rounded-3xl border"
+        className="flex items-center gap-4 px-6 py-4 rounded-2xl border"
         style={{
-          background:`linear-gradient(160deg, #0e0e16, #08080d)`,
-          borderColor:`${color}25`,
-          boxShadow:`0 0 60px -15px ${color}60, inset 0 1px 0 ${color}15`,
+          background: `linear-gradient(135deg, #0e0e16, #0a0a12)`,
+          borderColor: `${color}30`,
+          boxShadow: `0 0 30px -8px ${color}50, inset 0 1px 0 ${color}15`,
         }}
       >
-        <div className="text-[10px] font-black uppercase tracking-[0.5em] opacity-50" style={{ fontFamily:"'Orbitron',monospace", color }}>
-          ◆ LEVEL UP ◆
-        </div>
-        <div
-          className="text-[6rem] font-black leading-none tabular-nums"
-          style={{ fontFamily:"'Orbitron',monospace", color, textShadow:`0 0 30px ${color}, 0 0 60px ${color}60` }}
+        {/* Level number */}
+        <span
+          className="text-4xl font-black leading-none tabular-nums"
+          style={{ fontFamily:"'Orbitron',monospace", color, textShadow:`0 0 20px ${color}` }}
         >
           {level}
+        </span>
+        {/* Text */}
+        <div className="flex flex-col">
+          <span
+            className="text-[8px] font-black uppercase tracking-[0.4em]"
+            style={{ fontFamily:"'Orbitron',monospace", color, opacity:0.6 }}
+          >
+            level up
+          </span>
+          <span className="text-[10px] font-black text-white/40 uppercase tracking-widest" style={{ fontFamily:"'Orbitron',monospace" }}>
+            keep going
+          </span>
         </div>
-        <div className="text-[10px] font-black uppercase tracking-widest opacity-30" style={{ fontFamily:"'Orbitron',monospace" }}>
-          keep going
-        </div>
+        {/* Accent dot */}
+        <div className="w-2 h-2 rounded-full ml-1" style={{ background:color, boxShadow:`0 0 8px ${color}` }} />
       </div>
     </div>
   );
@@ -1262,7 +1271,6 @@ export default function NeuralSyncMaster() {
                         if (state === "cursor") {
                           return (
                             <span key={i} className="relative" style={{ display:"inline", whiteSpace:"pre" }}>
-                              <NeuralCursor bg={accentBg} glow={accentGlow} />
                               {/* The char AT the cursor — bright white + accent glow + underline */}
                               <span style={{
                                 display:"inline", whiteSpace:"pre",
