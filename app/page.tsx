@@ -23,10 +23,13 @@ import { Navbar } from "./components/navbar/Navbar";
 
 // ─── Game constants ───────────────────────────────────────────────────────────
 const XP_PER_CHAR   = 2;
-const XP_PER_LEVEL  = 200;
+const XP_PER_LEVEL  = 200; // base — actual threshold scales exponentially
 const MAX_HP        = 100;
 const HP_PER_ERROR  = 8;
-const COMBO_DECAY   = 3000; // ms before combo resets if idle
+const COMBO_DECAY   = 3000;
+
+// XP needed to reach level N (exponential curve)
+const xpForLevel = (lvl: number) => Math.floor(XP_PER_LEVEL * Math.pow(1.55, lvl - 1));
 const RANKS = [
   { min: 100, id:"S", label:"PERFECT",  color:"#facc15", glow:"rgba(250,204,21,0.6)"  },
   { min:  95, id:"A", label:"ELITE",    color:"#60a5fa", glow:"rgba(96,165,250,0.6)"  },
@@ -248,7 +251,12 @@ function NotifStack({ notifs }: { notifs: Notif[] }) {
 
 // ─── XP Bar ───────────────────────────────────────────────────────────────────
 function XPBar({ xp, level, color }: { xp: number; level: number; color: string }) {
-  const pct = ((xp % XP_PER_LEVEL) / XP_PER_LEVEL) * 100;
+  // Calculate XP spent to reach current level, and XP needed for next level
+  let spent = 0;
+  for (let l = 1; l < level; l++) spent += xpForLevel(l);
+  const needed  = xpForLevel(level);
+  const current = xp - spent;
+  const pct     = Math.min(100, Math.round((current / needed) * 100));
   return (
     <div className="flex items-center gap-3">
       <span className="text-[9px] font-black uppercase tracking-widest opacity-40" style={{ fontFamily:"'Orbitron',monospace" }}>LVL</span>
@@ -450,7 +458,7 @@ function CompletionScreen({ wpm, accuracy, time, combo, rank, onNext }: {
   useEffect(() => {
     // Start counting down after stats have had time to appear
     const startDelay = setTimeout(() => {
-      setRingKey(k => k + 1); // restart ring animation
+      setRingKey(k => k + 1);
       const interval = setInterval(() => {
         setCount(c => {
           if (c <= 1) {
@@ -463,7 +471,15 @@ function CompletionScreen({ wpm, accuracy, time, combo, rank, onNext }: {
       }, 1000);
       return () => clearInterval(interval);
     }, 1200);
-    return () => clearTimeout(startDelay);
+
+    // Escape or click to skip
+    const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") onNext(); };
+    window.addEventListener("keydown", handleKey);
+
+    return () => {
+      clearTimeout(startDelay);
+      window.removeEventListener("keydown", handleKey);
+    };
   }, [onNext]);
 
   const stats = [
@@ -482,6 +498,7 @@ function CompletionScreen({ wpm, accuracy, time, combo, rank, onNext }: {
     <div
       className="synced-bg fixed inset-0 z-[300] flex flex-col items-center justify-center"
       style={{ background:"rgba(3,3,5,0.92)", backdropFilter:"blur(24px)" }}
+      onClick={onNext}
     >
       {/* Radial color bloom behind everything */}
       <div
@@ -637,6 +654,12 @@ function CompletionScreen({ wpm, accuracy, time, combo, rank, onNext }: {
         </span>
       </div>
 
+      {/* ESC to skip hint */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 opacity-20 pointer-events-none">
+        <kbd className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md border border-white/30 font-mono">ESC</kbd>
+        <span className="text-[9px] font-black uppercase tracking-widest" style={{ fontFamily:"'Orbitron',monospace" }}>or click to skip</span>
+      </div>
+
       {/* Subtle corner brackets */}
       {[
         "top-8 left-8 border-t-2 border-l-2 rounded-tl-xl",
@@ -776,14 +799,21 @@ export default function NeuralSyncMaster() {
   const gainXP = useCallback((amount: number) => {
     setXp(prev => {
       const next = prev + amount;
-      const prevLvl = Math.floor(prev / XP_PER_LEVEL) + 1;
-      const nextLvl = Math.floor(next / XP_PER_LEVEL) + 1;
-      if (nextLvl > prevLvl) {
-        setPlayerLevel(nextLvl);
-        setLevelUpNum(nextLvl);
-        setShowLevelUp(true);
-        if (soundEnabled) audioRef.current?.levelup();
+      // Find what level the player should be at with `next` total XP
+      let newLvl = 1;
+      let accumulated = 0;
+      while (accumulated + xpForLevel(newLvl) <= next) {
+        accumulated += xpForLevel(newLvl);
+        newLvl++;
       }
+      setPlayerLevel(cur => {
+        if (newLvl > cur) {
+          setLevelUpNum(newLvl);
+          setShowLevelUp(true);
+          if (soundEnabled) audioRef.current?.levelup();
+        }
+        return newLvl;
+      });
       return next;
     });
   }, [soundEnabled]);
@@ -1140,7 +1170,6 @@ export default function NeuralSyncMaster() {
               isFocusMode || isZenMode ? "opacity-0 -translate-x-32 pointer-events-none" : "opacity-100 translate-x-0 w-[380px]"
             }`}>
               <div className="space-y-5 pr-8">
-                {/* Header */}
                 <div className="flex items-center gap-3 flex-wrap">
                   <div className="p-2 rounded-xl bg-white/5 border border-white/10">{LANG_ICONS[snippet.lang]}</div>
                   <span className="text-[9px] font-black uppercase tracking-[0.3em] opacity-40">{snippet.category}</span>
@@ -1150,23 +1179,19 @@ export default function NeuralSyncMaster() {
                   >
                     {snippet.level}
                   </span>
-                  {/* XP reward preview */}
                   <span className="text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border border-white/10 opacity-50">
                     +{snippet.code.length * 3} XP
                   </span>
                 </div>
-
                 <h1
                   className="text-3xl font-black text-white tracking-tighter leading-none uppercase"
                   style={{ fontFamily:"'Orbitron',monospace", textShadow:`0 0 20px ${accentColor}40` }}
                 >
                   {snippet.title}
                 </h1>
-
                 <p className="italic text-zinc-400 text-sm border-l-2 pl-4 leading-relaxed" style={{ borderColor:`${accentColor}40` }}>
                   {snippet.description}
                 </p>
-
                 {snippet.tags?.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {snippet.tags.map(t => (
@@ -1176,10 +1201,7 @@ export default function NeuralSyncMaster() {
                     ))}
                   </div>
                 )}
-
                 <p className="text-zinc-500 text-xs leading-relaxed">{snippet.realLifeUsage}</p>
-
-                {/* Stats mini */}
                 <div className="flex gap-4 text-[9px] font-black uppercase opacity-25">
                   <span>{snippet.code.length} chars</span>
                   <span>·</span>
@@ -1271,6 +1293,7 @@ export default function NeuralSyncMaster() {
                         if (state === "cursor") {
                           return (
                             <span key={i} className="relative" style={{ display:"inline", whiteSpace:"pre" }}>
+                              <NeuralCursor bg={accentBg} glow={accentGlow} />
                               {/* The char AT the cursor — bright white + accent glow + underline */}
                               <span style={{
                                 display:"inline", whiteSpace:"pre",
