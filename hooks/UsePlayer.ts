@@ -51,13 +51,15 @@ export function usePlayer() {
 
   // ── Load user + stats on mount ──────────────────────────────
   useEffect(() => {
-    const init = async () => {
+    const init = async (userId?: string) => {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        // Not logged in — fall back to localStorage
         setState(s => ({
           ...s,
+          user:           null,
+          username:       null,
+          avatarUrl:      null,
           isLoading:      false,
           xp:             +(localStorage.getItem("ns_xp")    ?? 0),
           playerLevel:    +(localStorage.getItem("ns_plvl")  ?? 1),
@@ -67,19 +69,21 @@ export function usePlayer() {
         return;
       }
 
-      // Fetch profile + stats
-      const [{ data: profile }, { data: stats }] = await Promise.all([
+      const [{ data: profileData }, { data: statsData }] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", user.id).single(),
         supabase.from("player_stats").select("*").eq("user_id", user.id).single(),
       ]);
 
+      const profile = profileData as { username: string | null; avatar_url: string | null } | null;
+      const stats   = statsData   as { xp: number; player_level: number; streak: number; total_completed: number; max_combo: number; best_wpm: number; } | null;
+
       setState({
         user,
-        username:       profile?.username ?? null,
-        avatarUrl:      profile?.avatar_url ?? null,
-        xp:             stats?.xp             ?? 0,
-        playerLevel:    stats?.player_level   ?? 1,
-        streak:         stats?.streak         ?? 0,
+        username:       profile?.username      ?? (user.user_metadata?.user_name as string)  ?? null,
+        avatarUrl:      profile?.avatar_url    ?? (user.user_metadata?.avatar_url as string) ?? null,
+        xp:             stats?.xp              ?? 0,
+        playerLevel:    stats?.player_level    ?? 1,
+        streak:         stats?.streak          ?? 0,
         totalCompleted: stats?.total_completed ?? 0,
         maxCombo:       stats?.max_combo       ?? 0,
         bestWpm:        stats?.best_wpm        ?? 0,
@@ -89,8 +93,12 @@ export function usePlayer() {
 
     init();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => init());
+    // Listen for auth changes (SIGNED_IN fires after OAuth redirect)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "TOKEN_REFRESHED") {
+        init();
+      }
+    });
     return () => subscription.unsubscribe();
   }, []);
 

@@ -1,11 +1,11 @@
 // app/api/sessions/route.ts
 // POST — save a completed snippet session + update player stats
 
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
 
   // ── Auth check ──────────────────────────────────────────────
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -44,18 +44,18 @@ export async function POST(request: NextRequest) {
     .from("player_stats")
     .select("*")
     .eq("user_id", user.id)
-    .single();
+    .single() as { data: { xp: number; total_completed: number; max_combo: number; best_wpm: number } | null };
 
   const { error: statsError } = await supabase
     .from("player_stats")
     .upsert({
       user_id:         user.id,
-      xp:              (current?.xp ?? 0) + body.xp_gained,
+      xp:              ((current as any)?.xp ?? 0) + body.xp_gained,
       player_level:    body.player_level,
       streak:          body.streak,
-      total_completed: (current?.total_completed ?? 0) + 1,
-      max_combo:       Math.max(current?.max_combo ?? 0, combo ?? 0),
-      best_wpm:        Math.max(current?.best_wpm ?? 0, wpm),
+      total_completed: ((current as any)?.total_completed ?? 0) + 1,
+      max_combo:       Math.max((current as any)?.max_combo ?? 0, combo ?? 0),
+      best_wpm:        Math.max((current as any)?.best_wpm ?? 0, wpm),
       updated_at:      new Date().toISOString(),
     });
 

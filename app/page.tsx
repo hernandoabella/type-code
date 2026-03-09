@@ -20,6 +20,7 @@ export interface Snippet {
 
 import { HIGHLIGHT_THEMES, ACCENTS, FONTS, LANG_ICONS, SNIPPETS } from "./config/constants";
 import { Navbar } from "./components/navbar/Navbar";
+import { usePlayer } from "@/hooks/usePlayer";
 
 // ─── Game constants ───────────────────────────────────────────────────────────
 const XP_PER_CHAR   = 2;
@@ -718,18 +719,31 @@ export default function NeuralSyncMaster() {
   const [wpm,            setWpm]            = useState(0);
   const [accuracy,       setAccuracy]       = useState(100);
 
-  // ── Game state ──────────────────────────────────────────────────────────────
-  const [xp,             setXp]             = useState(0);
-  const [playerLevel,    setPlayerLevel]    = useState(1);
-  const [hp,             setHp]             = useState(MAX_HP);
-  const [combo,          setCombo]          = useState(0);
-  const [maxCombo,       setMaxCombo]       = useState(0);
-  const [streak,         setStreak]         = useState(0);
-  const [totalCompleted, setTotalCompleted] = useState(0);
-  const [showLevelUp,    setShowLevelUp]    = useState(false);
-  const [levelUpNum,     setLevelUpNum]     = useState(1);
-  const [notifs,         setNotifs]         = useState<Notif[]>([]);
-  const notifIdRef                          = useRef(0);
+  // ── Game state (persistent via usePlayer) ───────────────────────────────────
+  const {
+    xp, playerLevel, streak, totalCompleted,
+    saveSession,
+  } = usePlayer();
+
+  // Local-only game state (resets each session)
+  const [hp,          setHp]          = useState(MAX_HP);
+  const [combo,       setCombo]       = useState(0);
+  const [maxCombo,    setMaxCombo]    = useState(0);
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const [levelUpNum,  setLevelUpNum]  = useState(1);
+  const [notifs,      setNotifs]      = useState<Notif[]>([]);
+  const notifIdRef                    = useRef(0);
+
+  // Local mirrors for optimistic level-up detection
+  const prevPlayerLevelRef = useRef(playerLevel);
+  useEffect(() => {
+    if (playerLevel > prevPlayerLevelRef.current) {
+      setLevelUpNum(playerLevel);
+      setShowLevelUp(true);
+      if (soundEnabled) audioRef.current?.levelup();
+    }
+    prevPlayerLevelRef.current = playerLevel;
+  }, [playerLevel, soundEnabled]);
 
   // ── Refs ────────────────────────────────────────────────────────────────────
   const textareaRef    = useRef<HTMLTextAreaElement>(null);
@@ -796,27 +810,11 @@ export default function NeuralSyncMaster() {
   }, []);
 
   // ── XP gain helper ────────────────────────────────────────────────────────
+  // XP is persisted via saveSession at completion; this is for local combo/level display only
+  const [localXp, setLocalXp] = useState(0);
   const gainXP = useCallback((amount: number) => {
-    setXp(prev => {
-      const next = prev + amount;
-      // Find what level the player should be at with `next` total XP
-      let newLvl = 1;
-      let accumulated = 0;
-      while (accumulated + xpForLevel(newLvl) <= next) {
-        accumulated += xpForLevel(newLvl);
-        newLvl++;
-      }
-      setPlayerLevel(cur => {
-        if (newLvl > cur) {
-          setLevelUpNum(newLvl);
-          setShowLevelUp(true);
-          if (soundEnabled) audioRef.current?.levelup();
-        }
-        return newLvl;
-      });
-      return next;
-    });
-  }, [soundEnabled]);
+    setLocalXp(prev => prev + amount);
+  }, []);
 
   // ── CSS inject ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -831,25 +829,17 @@ export default function NeuralSyncMaster() {
   // ── Mount ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     setMounted(true);
+    // Level index and sound still live in localStorage (UI prefs, not game stats)
     const ls = localStorage;
-    if (ls.getItem("ns_level"))   setLevel(+ls.getItem("ns_level")!);
-    if (ls.getItem("ns_streak"))  setStreak(+ls.getItem("ns_streak")!);
-    if (ls.getItem("ns_total"))   setTotalCompleted(+ls.getItem("ns_total")!);
-    if (ls.getItem("ns_xp"))      setXp(+ls.getItem("ns_xp")!);
-    if (ls.getItem("ns_plvl"))    setPlayerLevel(+ls.getItem("ns_plvl")!);
-    if (ls.getItem("ns_sound"))   setSoundEnabled(ls.getItem("ns_sound") !== "false");
+    if (ls.getItem("ns_level")) setLevel(+ls.getItem("ns_level")!);
+    if (ls.getItem("ns_sound")) setSoundEnabled(ls.getItem("ns_sound") !== "false");
   }, []);
 
   useEffect(() => {
     if (!mounted) return;
-    const ls = localStorage;
-    ls.setItem("ns_level",  level.toString());
-    ls.setItem("ns_streak", streak.toString());
-    ls.setItem("ns_total",  totalCompleted.toString());
-    ls.setItem("ns_xp",     xp.toString());
-    ls.setItem("ns_plvl",   playerLevel.toString());
-    ls.setItem("ns_sound",  soundEnabled.toString());
-  }, [level, streak, totalCompleted, xp, playerLevel, soundEnabled, mounted]);
+    localStorage.setItem("ns_level", level.toString());
+    localStorage.setItem("ns_sound", soundEnabled.toString());
+  }, [level, soundEnabled, mounted]);
 
   // ── ESC ───────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -926,13 +916,23 @@ export default function NeuralSyncMaster() {
       if (autoWriteRef.current) { clearInterval(autoWriteRef.current); autoWriteRef.current = null; }
       if (timerRef.current) clearInterval(timerRef.current);
       if (comboTimerRef.current) clearTimeout(comboTimerRef.current);
-      setStreak(s => s + 1);
-      setTotalCompleted(t => t + 1);
-      const finalRank = getRank(calcAcc(val, snippet.code));
+      const finalAcc  = calcAcc(val, snippet.code);
+      const finalRank = getRank(finalAcc);
+      const xpGained  = snippet.code.length * 3 + combo * 5;
       pushNotif(`${finalRank.id} RANK — ${finalRank.label}!`, finalRank.color);
-      // Bonus XP on completion
-      gainXP(snippet.code.length * 3 + combo * 5);
       if (soundEnabled) audioRef.current?.win();
+      // Persist session + update stats via usePlayer
+      saveSession({
+        snippet_id:   snippet.id,
+        wpm,
+        accuracy:     finalAcc,
+        time_elapsed: timeElapsed,
+        combo:        maxCombo,
+        rank:         finalRank.id,
+        xp_gained:    xpGained,
+        player_level: playerLevel,
+        streak:       streak + 1,
+      });
       gsap.timeline()
         .to(terminalRef.current, { boxShadow:`0 0 120px -10px ${accentShadow}`, duration:0.5, ease:"power2.out" })
         .to(terminalRef.current, { boxShadow:"none", duration:1.2, ease:"power2.in" });
@@ -1147,7 +1147,7 @@ export default function NeuralSyncMaster() {
       <div className="max-w-[1500px] w-full flex flex-col gap-14 h-full relative z-10">
 
         <Navbar
-          accent={{ class:accentClass, bg:accentBg, shadow:accentShadow } as any}
+          accent={{ class:accentClass, bg:accentBg, shadow:accentShadow, color:accentColor } as any}
           selectedAccent={selectedAccent}   setSelectedAccent={setSelectedAccent}
           langFilter={langFilter}           setLangFilter={setLangFilter}
           languages={languages}
@@ -1160,6 +1160,7 @@ export default function NeuralSyncMaster() {
           isZenMode={isZenMode}             setIsZenMode={setIsZenMode}
           isRecallMode={isRecallMode}       setIsRecallMode={setIsRecallMode}
           isBlindMode={false}               setIsBlindMode={() => {}}
+          resetCurrentSnippet={resetSnippet}
         />
 
         {snippet && (

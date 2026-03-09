@@ -2,6 +2,8 @@
 // TypeScript types matching the Supabase schema
 // Tip: regenerate with `npx supabase gen types typescript --project-id YOUR_ID > lib/database.types.ts`
 
+export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+
 export type Database = {
   public: {
     Tables: {
@@ -13,8 +15,8 @@ export type Database = {
           created_at: string;
         };
         Insert: {
-          id:         string;
-          username?:  string | null;
+          id:          string;
+          username?:   string | null;
           avatar_url?: string | null;
           created_at?: string;
         };
@@ -22,6 +24,7 @@ export type Database = {
           username?:   string | null;
           avatar_url?: string | null;
         };
+        Relationships: [];
       };
       player_stats: {
         Row: {
@@ -42,6 +45,7 @@ export type Database = {
           total_completed?: number;
           max_combo?:       number;
           best_wpm?:        number;
+          updated_at?:      string;
         };
         Update: {
           xp?:              number;
@@ -52,6 +56,14 @@ export type Database = {
           best_wpm?:        number;
           updated_at?:      string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "player_stats_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       sessions: {
         Row: {
@@ -66,6 +78,7 @@ export type Database = {
           completed_at: string;
         };
         Insert: {
+          id?:          string;
           user_id:      string;
           snippet_id:   string;
           wpm:          number;
@@ -73,23 +86,42 @@ export type Database = {
           time_elapsed: number;
           combo?:       number;
           rank:         string;
+          completed_at?: string;
         };
+        Update: {
+          wpm?:          number;
+          accuracy?:     number;
+          time_elapsed?: number;
+          combo?:        number;
+          rank?:         string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sessions_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
     };
     Views: {
       leaderboard: {
         Row: {
-          id:              string;
+          id:              string | null;
           username:        string | null;
           avatar_url:      string | null;
-          xp:              number;
-          player_level:    number;
-          total_completed: number;
-          best_wpm:        number;
-          max_combo:       number;
-          streak:          number;
+          xp:              number | null;
+          player_level:    number | null;
+          total_completed: number | null;
+          best_wpm:        number | null;
+          max_combo:       number | null;
+          streak:          number | null;
         };
+        Relationships: [];
       };
     };
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
   };
 };
