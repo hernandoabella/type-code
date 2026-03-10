@@ -1054,6 +1054,73 @@ export default function NeuralSyncMaster() {
     setTimeout(() => setNotifs(n => n.filter(x => x.id !== id)), 2200);
   }, []);
 
+
+  // ── Supabase client (stable ref) ─────────────────────────────────────────
+  const supabaseRef = useRef(createClient());
+
+  // ── Save session to Supabase on victory ───────────────────────────────────
+  const saveSession = useCallback(async ({
+    snippetId, wpmVal, accuracyVal, timeVal, comboVal, rankVal, xpGained, newStreak, newTotal,
+  }: {
+    snippetId: string; wpmVal: number; accuracyVal: number; timeVal: number;
+    comboVal: number; rankVal: string; xpGained: number; newStreak: number; newTotal: number;
+  }) => {
+    if (!user) return;
+    const sb = supabaseRef.current;
+    try {
+      // 1. Guardar sesion
+      await sb.from("sessions").insert({
+        user_id:      user.id,
+        snippet_id:   snippetId,
+        wpm:          wpmVal,
+        accuracy:     accuracyVal,
+        time_elapsed: timeVal,
+        combo:        comboVal,
+        rank:         rankVal,
+        completed_at: new Date().toISOString(),
+      });
+
+      // 2. Leer stats actuales del leaderboard
+      const { data: existing } = await sb
+        .from("leaderboard")
+        .select("best_wpm, max_combo, xp, player_level")
+        .eq("id", user.id)
+        .single();
+
+      const newXp = (existing?.xp ?? 0) + xpGained;
+      let newLvl = 1;
+      let acc2 = 0;
+      while (acc2 + xpForLevel(newLvl) <= newXp) { acc2 += xpForLevel(newLvl); newLvl++; }
+
+      // 3. Upsert leaderboard
+      await sb.from("leaderboard").upsert({
+        id:              user.id,
+        username:        username ?? user.email?.split("@")[0] ?? "player",
+        avatar_url:      avatarUrl ?? null,
+        xp:              newXp,
+        player_level:    newLvl,
+        total_completed: newTotal,
+        best_wpm:        Math.max(existing?.best_wpm ?? 0, wpmVal),
+        max_combo:       Math.max(existing?.max_combo ?? 0, comboVal),
+        streak:          newStreak,
+      }, { onConflict: "id" });
+
+      // 4. Upsert profiles
+      await sb.from("profiles").upsert({
+        id:              user.id,
+        username:        username ?? user.email?.split("@")[0] ?? "player",
+        xp:              newXp,
+        player_level:    newLvl,
+        total_completed: newTotal,
+        streak:          newStreak,
+        updated_at:      new Date().toISOString(),
+      }, { onConflict: "id" });
+
+    } catch (err) {
+      console.error("[NeuralSync] Error saving session:", err);
+    }
+  }, [user, username, avatarUrl]);
+
   // ── XP gain helper ────────────────────────────────────────────────────────
   const gainXP = useCallback((amount: number) => {
     setXp(prev => {
@@ -1173,17 +1240,34 @@ export default function NeuralSyncMaster() {
       if (autoWriteRef.current) { clearInterval(autoWriteRef.current); autoWriteRef.current = null; }
       if (timerRef.current) clearInterval(timerRef.current);
       if (comboTimerRef.current) clearTimeout(comboTimerRef.current);
-      setStreak(s => s + 1);
-      setTotalCompleted(t => t + 1);
+      const newStreak = streak + 1;
+      const newTotal  = totalCompleted + 1;
+      setStreak(newStreak);
+      setTotalCompleted(newTotal);
       const finalRank = getRank(calcAcc(val, snippet.code));
+      const finalAcc  = calcAcc(val, snippet.code);
+      const finalWpm  = startTime ? Math.round(val.length / 5 / ((Date.now() - startTime) / 60000)) || 0 : 0;
+      const xpGained  = snippet.code.length * 3 + combo * 5;
       pushNotif(`${finalRank.id} RANK — ${finalRank.label}!`, finalRank.color);
-      gainXP(snippet.code.length * 3 + combo * 5);
+      gainXP(xpGained);
+      // Guardar en Supabase
+      saveSession({
+        snippetId: snippet.id,
+        wpmVal:    finalWpm,
+        accuracyVal: finalAcc,
+        timeVal:   startTime ? Date.now() - startTime : 0,
+        comboVal:  combo,
+        rankVal:   finalRank.id,
+        xpGained,
+        newStreak,
+        newTotal,
+      });
       if (soundEnabled) audioRef.current?.win();
       gsap.timeline()
         .to(terminalRef.current, { boxShadow:`0 0 120px -10px ${accentShadow}`, duration:0.5, ease:"power2.out" })
         .to(terminalRef.current, { boxShadow:"none", duration:1.2, ease:"power2.in" });
     }
-  }, [finished, snippet, startTime, soundEnabled, combo, accentShadow, gainXP, pushNotif]);
+  }, [finished, snippet, startTime, soundEnabled, combo, streak, totalCompleted, accentShadow, gainXP, pushNotif, saveSession]);
 
   // ── Reset ─────────────────────────────────────────────────────────────────
   const resetSnippet = useCallback(() => {
@@ -1290,7 +1374,7 @@ export default function NeuralSyncMaster() {
       )}
 
       {/* ── Game HUD — bottom bar ── */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex items-stretch bg-black/95 backdrop-blur-3xl border border-white/[0.07] rounded-[1.75rem] shadow-2xl overflow-hidden"
+      <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex items-stretch bg-black/95 backdrop-blur-3xl border border-white/[0.07] rounded-[1.75rem] shadow-2xl overflow-hidden transition-all duration-500 ${isZenMode ? "opacity-0 translate-y-8 pointer-events-none scale-95" : "opacity-100 translate-y-0 scale-100"}`}
         style={{ boxShadow:`0 0 40px -10px ${accentColor}30` }}>
         <div className="absolute top-0 left-0 right-0">
           <ProgressBar value={progress} color={accentColor} finished={finished} />
