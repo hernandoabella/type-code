@@ -1,19 +1,37 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import { VscTarget, VscRefresh, VscSettingsGear, VscClose } from "react-icons/vsc";
 import Logo from "./Logo";
 import Selectors from "./Selectors";
 import FontSize from "./FontSize";
 import ModesMenu from "./ModesMenu";
 import { Accents } from "./Accents";
-import { AuthButton } from "../../components/Authbutton";
+import { AuthButton } from "../Authbutton";
 import { ACCENTS } from "../../config/constants";
+
+// ─── Dashboard icon ──────────────────────────────────────────────────────────
+function DashboardIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+      <rect x="1" y="1" width="6" height="6" rx="1.5" />
+      <rect x="9" y="1" width="6" height="6" rx="1.5" />
+      <rect x="1" y="9" width="6" height="6" rx="1.5" />
+      <rect x="9" y="9" width="6" height="6" rx="1.5" />
+    </svg>
+  );
+}
 
 export const Navbar = (props: any) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { accent, isZenMode, setIsZenMode, resetCurrentSnippet, selectedAccent, setSelectedAccent } = props;
   const accentColor = accent?.color ?? "#63cab7";
+
+  // ── Persist accent color for dashboard to read ─────────────────────────
+  useEffect(() => {
+    if (accentColor) localStorage.setItem("ns_accent_color", accentColor);
+  }, [accentColor]);
 
   return (
     <>
@@ -41,7 +59,7 @@ export const Navbar = (props: any) => {
 
           <div className="h-6 md:h-8 w-px bg-white/10 mx-1 md:mx-2" />
 
-          {/* ── Accent color buttons with visual color ── */}
+          {/* ── Accent color buttons ── */}
           <div className="hidden sm:flex items-center gap-1.5 px-1">
             {ACCENTS.map((a: any) => {
               const hex      = a.hex ?? "#63cab7";
@@ -61,24 +79,15 @@ export const Navbar = (props: any) => {
                     boxShadow:    isActive ? `0 0 10px ${hex}50` : "none",
                   }}
                 >
-                  {/* Color swatch */}
-                  <span
-                    style={{
-                      display:      "block",
-                      width:        isActive ? "10px" : "8px",
-                      height:       isActive ? "10px" : "8px",
-                      borderRadius: "3px",
-                      background:   hex,
-                      boxShadow:    isActive ? `0 0 6px ${hex}` : "none",
-                      transition:   "all 0.2s",
-                    }}
-                  />
-                  {/* Active tick */}
+                  <span style={{
+                    display: "block", width: isActive ? "10px" : "8px", height: isActive ? "10px" : "8px",
+                    borderRadius: "3px", background: hex,
+                    boxShadow: isActive ? `0 0 6px ${hex}` : "none",
+                    transition: "all 0.2s",
+                  }} />
                   {isActive && (
-                    <span
-                      className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full flex items-center justify-center"
-                      style={{ background: hex, boxShadow: `0 0 6px ${hex}` }}
-                    >
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full flex items-center justify-center"
+                      style={{ background: hex, boxShadow: `0 0 6px ${hex}` }}>
                       <svg viewBox="0 0 8 8" className="w-1.5 h-1.5">
                         <polyline points="1,4 3,6 7,2" fill="none" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
                       </svg>
@@ -93,6 +102,8 @@ export const Navbar = (props: any) => {
 
           {/* Actions */}
           <div className="flex items-center gap-1 md:gap-1.5">
+
+            {/* Reset */}
             <button
               onClick={() => window.confirm("¿Reset?") && resetCurrentSnippet?.()}
               className="p-2 md:p-2.5 rounded-full md:rounded-xl hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-all"
@@ -100,6 +111,7 @@ export const Navbar = (props: any) => {
               <VscRefresh size={16} />
             </button>
 
+            {/* Mobile menu toggle */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="lg:hidden p-2 md:p-2.5 rounded-full bg-white/5 text-zinc-400 hover:text-white transition-all"
@@ -107,6 +119,7 @@ export const Navbar = (props: any) => {
               {isMobileMenuOpen ? <VscClose size={16} /> : <VscSettingsGear size={16} />}
             </button>
 
+            {/* Zen mode */}
             <button
               onClick={() => setIsZenMode(true)}
               className="hidden md:flex p-2.5 rounded-xl hover:bg-white/5 text-zinc-500 hover:text-white transition-all"
@@ -114,7 +127,31 @@ export const Navbar = (props: any) => {
               <VscTarget size={18} />
             </button>
 
-            {/* ── Auth ── */}
+            {/* ── Dashboard button ── */}
+            <Link
+              href="/dashboard"
+              className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl border transition-all hover:opacity-90 active:scale-95 group/dash"
+              style={{
+                borderColor: `${accentColor}35`,
+                background:  `${accentColor}0d`,
+                color:        accentColor,
+              }}
+            >
+              {/* Live dot */}
+              <span className="relative flex-shrink-0 w-1.5 h-1.5">
+                <span className="absolute inset-0 rounded-full animate-ping opacity-60" style={{ background: accentColor }} />
+                <span className="relative block w-1.5 h-1.5 rounded-full" style={{ background: accentColor, boxShadow: `0 0 5px ${accentColor}` }} />
+              </span>
+              <DashboardIcon size={14} />
+              <span
+                className="text-[8px] font-black uppercase tracking-[0.2em] hidden lg:block"
+                style={{ fontFamily: "'Orbitron', monospace" }}
+              >
+                Stats
+              </span>
+            </Link>
+
+            {/* Auth */}
             <div className="hidden sm:block">
               <AuthButton accentColor={accentColor} />
             </div>
@@ -140,30 +177,17 @@ export const Navbar = (props: any) => {
                   const hex      = a.hex ?? "#63cab7";
                   const isActive = selectedAccent?.bg === a.bg;
                   return (
-                    <button
-                      key={a.bg}
-                      onClick={() => setSelectedAccent(a)}
+                    <button key={a.bg} onClick={() => setSelectedAccent(a)}
                       className="relative flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 active:scale-95"
                       style={{
                         background:  isActive ? `${hex}18` : "rgba(255,255,255,0.04)",
                         border:      `1px solid ${isActive ? hex : "rgba(255,255,255,0.08)"}`,
                         boxShadow:   isActive ? `0 0 10px ${hex}30` : "none",
-                      }}
-                    >
-                      <span
-                        style={{
-                          display: "block", width: "10px", height: "10px",
-                          borderRadius: "3px", background: hex,
-                          boxShadow: isActive ? `0 0 6px ${hex}` : "none",
-                        }}
-                      />
+                      }}>
+                      <span style={{ display:"block", width:"10px", height:"10px", borderRadius:"3px", background:hex, boxShadow:isActive?`0 0 6px ${hex}`:"none" }} />
                       {a.label && (
-                        <span
-                          className="text-[9px] font-black uppercase tracking-widest"
-                          style={{ color: isActive ? hex : "rgba(255,255,255,0.3)" }}
-                        >
-                          {a.label}
-                        </span>
+                        <span className="text-[9px] font-black uppercase tracking-widest"
+                          style={{ color: isActive ? hex : "rgba(255,255,255,0.3)" }}>{a.label}</span>
                       )}
                     </button>
                   );
@@ -182,15 +206,27 @@ export const Navbar = (props: any) => {
               </div>
             </div>
 
+            {/* Dashboard link — mobile */}
+            <Link href="/dashboard"
+              className="flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all"
+              style={{ borderColor: `${accentColor}30`, background: `${accentColor}08` }}
+              onClick={() => setIsMobileMenuOpen(false)}>
+              <span className="relative w-2 h-2 flex-shrink-0">
+                <span className="absolute inset-0 rounded-full animate-ping opacity-50" style={{ background: accentColor }} />
+                <span className="relative block w-2 h-2 rounded-full" style={{ background: accentColor }} />
+              </span>
+              <DashboardIcon size={15} />
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] flex-1"
+                style={{ color: accentColor, fontFamily: "'Orbitron', monospace" }}>War Room</span>
+            </Link>
+
             {/* Auth — mobile */}
             <div className="flex items-center justify-between border-t border-white/5 pt-4">
               <AuthButton accentColor={accentColor} />
             </div>
 
-            <button
-              onClick={() => setIsZenMode(true)}
-              className="w-full py-4 bg-white/5 rounded-2xl flex items-center justify-center gap-3 text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-white transition-all"
-            >
+            <button onClick={() => setIsZenMode(true)}
+              className="w-full py-4 bg-white/5 rounded-2xl flex items-center justify-center gap-3 text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-white transition-all">
               <VscTarget size={18} /> Zen Mode
             </button>
           </div>
@@ -198,10 +234,8 @@ export const Navbar = (props: any) => {
       </nav>
 
       {isMobileMenuOpen && (
-        <div
-          className="fixed inset-0 z-[190] bg-black/60 backdrop-blur-sm lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
+        <div className="fixed inset-0 z-[190] bg-black/60 backdrop-blur-sm lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)} />
       )}
     </>
   );
