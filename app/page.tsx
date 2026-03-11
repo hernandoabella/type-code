@@ -407,6 +407,14 @@ function CompletionScreen({ wpm, accuracy, time, combo, rank, onNext }: {
 }) {
   const [count, setCount] = useState(COUNTDOWN_SECS);
   const [ringKey, setRingKey] = useState(0);
+
+  // ESC to skip
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onNext(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onNext]);
+
   useEffect(() => {
     const startDelay = setTimeout(() => {
       setRingKey(k => k + 1);
@@ -419,63 +427,87 @@ function CompletionScreen({ wpm, accuracy, time, combo, rank, onNext }: {
   }, [onNext]);
 
   const stats = [
-    { l:"WPM",   v:String(wpm),      color:wpm > 80 ? "#4ade80" : "#e2e8f0", delay:"0.7s" },
-    { l:"ACC",   v:`${accuracy}%`,   color:accuracy >= 98 ? rank.color : accuracy >= 90 ? "#facc15" : "#f87171", delay:"0.8s" },
-    { l:"TIME",  v:fmtTime(time),    color:"#e2e8f0", delay:"0.9s" },
-    { l:"COMBO", v:`${combo}x`,      color:"#a78bfa", delay:"1.0s" },
+    { l:"WPM",   v:String(wpm),    color:wpm > 80 ? "#4ade80" : "#e2e8f0" },
+    { l:"ACC",   v:`${accuracy}%`, color:accuracy >= 98 ? rank.color : accuracy >= 90 ? "#facc15" : "#f87171" },
+    { l:"TIME",  v:fmtTime(time),  color:"#e2e8f0" },
+    { l:"COMBO", v:`${combo}x`,    color:"#a78bfa" },
   ];
-  const R = 45, C = 2 * Math.PI * R, dur = `${COUNTDOWN_SECS - 1}s`;
+  const R = 28, C = 2 * Math.PI * R, dur = `${COUNTDOWN_SECS - 1}s`;
 
   return (
-    <div className="synced-bg fixed inset-0 z-[300] flex flex-col items-center justify-center"
-      style={{ background:"rgba(3,3,5,0.92)", backdropFilter:"blur(24px)" }}>
-      <div className="absolute inset-0 pointer-events-none"
-        style={{ background:`radial-gradient(ellipse 60% 50% at 50% 50%, ${rank.color}12 0%, transparent 70%)` }} />
-      <div className="synced-title relative flex flex-col items-center">
-        <span className="absolute select-none pointer-events-none"
-          style={{ fontFamily:"'Orbitron',monospace", fontSize:"clamp(5rem,14vw,12rem)", fontWeight:900, color:"transparent", WebkitTextStroke:`1px ${rank.color}15`, letterSpacing:"0.18em", transform:"scale(1.08)", filter:"blur(2px)" }}>
-          SYNCED
-        </span>
-        <span style={{ fontFamily:"'Orbitron',monospace", fontSize:"clamp(5rem,14vw,12rem)", fontWeight:900, color:"#fff", letterSpacing:"0.18em", lineHeight:1, textShadow:`0 0 40px ${rank.color}90,0 0 80px ${rank.color}40,0 0 120px ${rank.color}20` }}>
-          SYNCED
-        </span>
-      </div>
-      <div className="synced-rank mt-8 flex items-center gap-4 px-8 py-4 rounded-2xl border"
-        style={{ borderColor:`${rank.color}35`, background:`${rank.color}0e`, boxShadow:`0 0 40px -10px ${rank.glow}` }}>
-        <span className="text-5xl font-black" style={{ fontFamily:"'Orbitron',monospace", color:rank.color, textShadow:`0 0 20px ${rank.color}` }}>{rank.id}</span>
-        <div className="flex flex-col">
-          <span className="text-xs font-black uppercase tracking-[0.3em]" style={{ fontFamily:"'Orbitron',monospace", color:rank.color, opacity:0.7 }}>{rank.label}</span>
-          <span className="text-[10px] opacity-25 font-mono mt-0.5">rank achieved</span>
-        </div>
-      </div>
-      <div className="synced-line mt-10 h-px rounded-full"
-        style={{ background:`linear-gradient(90deg,transparent,${rank.color}50,transparent)` }} />
-      <div className="flex items-end gap-12 mt-10">
-        {stats.map(({ l, v, color, delay }) => (
-          <div key={l} className="synced-stat flex flex-col items-center gap-2" style={{ animationDelay:delay }}>
-            <span className="text-[9px] font-black uppercase tracking-[0.25em]" style={{ fontFamily:"'Orbitron',monospace", color:"#ffffff30" }}>{l}</span>
-            <span style={{ fontFamily:"'Orbitron',monospace", fontSize:"clamp(1.5rem,3vw,2.5rem)", fontWeight:900, color, lineHeight:1, textShadow:`0 0 16px ${color}80` }}>{v}</span>
-          </div>
+    <div
+      className="synced-bg fixed inset-0 z-[300] flex items-center justify-center"
+      style={{ background:"rgba(3,3,5,0.75)", backdropFilter:"blur(16px)" }}
+      onClick={onNext}
+    >
+      {/* Card — click outside closes, click inside doesn't */}
+      <div
+        className="synced-title relative flex flex-col items-center gap-5 px-10 py-8 rounded-[2rem] border"
+        style={{
+          background: "rgba(6,6,10,0.97)",
+          borderColor: `${rank.color}25`,
+          boxShadow: `0 0 60px -10px ${rank.glow}, inset 0 1px 0 ${rank.color}12`,
+          maxWidth: 480,
+          width: "90vw",
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Corner brackets */}
+        {["top-4 left-4 border-l-2 border-t-2 rounded-tl-lg","top-4 right-4 border-r-2 border-t-2 rounded-tr-lg","bottom-4 left-4 border-l-2 border-b-2 rounded-bl-lg","bottom-4 right-4 border-r-2 border-b-2 rounded-br-lg"].map((cls,i) => (
+          <div key={i} className={`absolute w-5 h-5 pointer-events-none ${cls}`} style={{ borderColor:`${rank.color}35` }} />
         ))}
-      </div>
-      <div className="synced-stat mt-10 flex flex-col items-center gap-3" style={{ animationDelay:"1.2s" }}>
-        <div className="relative w-24 h-24 flex items-center justify-center">
-          <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
-            <circle cx="50" cy="50" r={R} fill="none" stroke={`${rank.color}18`} strokeWidth="4" />
-            <circle key={ringKey} className="countdown-ring" cx="50" cy="50" r={R} fill="none" stroke={rank.color} strokeWidth="4" strokeLinecap="round"
-              strokeDasharray={C} strokeDashoffset={0}
-              style={{ animationDuration:dur, animationDelay:"1.2s", filter:`drop-shadow(0 0 6px ${rank.color})` }} />
-          </svg>
-          <span className="relative tabular-nums font-black"
-            style={{ fontFamily:"'Orbitron',monospace", fontSize:"2rem", color:count<=2?"#f87171":rank.color, textShadow:`0 0 16px ${count<=2?"#f87171":rank.color}`, transition:"color 0.3s,text-shadow 0.3s" }}>
-            {count}
+
+        {/* SYNCED title */}
+        <div className="relative">
+          <span className="absolute select-none pointer-events-none"
+            style={{ fontFamily:"'Orbitron',monospace", fontSize:"clamp(2.2rem,6vw,3.5rem)", fontWeight:900, color:"transparent", WebkitTextStroke:`1px ${rank.color}20`, letterSpacing:"0.2em", transform:"scale(1.06)", filter:"blur(1.5px)", display:"block" }}>
+            SYNCED
+          </span>
+          <span style={{ fontFamily:"'Orbitron',monospace", fontSize:"clamp(2.2rem,6vw,3.5rem)", fontWeight:900, color:"#fff", letterSpacing:"0.2em", lineHeight:1, textShadow:`0 0 30px ${rank.color}90,0 0 60px ${rank.color}30`, display:"block" }}>
+            SYNCED
           </span>
         </div>
-        <span className="text-[9px] font-black uppercase tracking-[0.3em]" style={{ fontFamily:"'Orbitron',monospace", color:"#ffffff30" }}>next challenge</span>
+
+        {/* Rank badge */}
+        <div className="flex items-center gap-3 px-5 py-2 rounded-xl border"
+          style={{ borderColor:`${rank.color}30`, background:`${rank.color}0c` }}>
+          <span className="text-2xl font-black" style={{ fontFamily:"'Orbitron',monospace", color:rank.color, textShadow:`0 0 14px ${rank.color}` }}>{rank.id}</span>
+          <span className="text-[9px] font-black uppercase tracking-[0.3em] opacity-60" style={{ fontFamily:"'Orbitron',monospace", color:rank.color }}>{rank.label}</span>
+        </div>
+
+        {/* Stats row */}
+        <div className="flex items-end gap-8">
+          {stats.map(({ l, v, color }) => (
+            <div key={l} className="synced-stat flex flex-col items-center gap-1">
+              <span className="text-[7px] font-black uppercase tracking-[0.25em] opacity-25" style={{ fontFamily:"'Orbitron',monospace" }}>{l}</span>
+              <span style={{ fontFamily:"'Orbitron',monospace", fontSize:"clamp(1.2rem,2.5vw,1.8rem)", fontWeight:900, color, lineHeight:1, textShadow:`0 0 12px ${color}60` }}>{v}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Countdown + ESC hint */}
+        <div className="flex items-center gap-4">
+          <div className="relative w-14 h-14 flex items-center justify-center flex-shrink-0">
+            <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 72 72">
+              <circle cx="36" cy="36" r={R} fill="none" stroke={`${rank.color}18`} strokeWidth="3" />
+              <circle key={ringKey} className="countdown-ring" cx="36" cy="36" r={R} fill="none" stroke={rank.color} strokeWidth="3" strokeLinecap="round"
+                strokeDasharray={C} strokeDashoffset={0}
+                style={{ animationDuration:dur, animationDelay:"1.2s", filter:`drop-shadow(0 0 4px ${rank.color})` }} />
+            </svg>
+            <span className="relative tabular-nums font-black text-xl"
+              style={{ fontFamily:"'Orbitron',monospace", color:count<=2?"#f87171":rank.color, transition:"color 0.3s" }}>
+              {count}
+            </span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[8px] font-black uppercase tracking-[0.3em] opacity-25" style={{ fontFamily:"'Orbitron',monospace" }}>next challenge</span>
+            <div className="flex items-center gap-2">
+              <kbd className="px-2 py-0.5 rounded-md text-[7px] font-black" style={{ background:`${rank.color}15`, color:rank.color, fontFamily:"'Orbitron',monospace", border:`1px solid ${rank.color}25` }}>ESC</kbd>
+              <span className="text-[7px] opacity-20 uppercase tracking-wider" style={{ fontFamily:"'Orbitron',monospace" }}>or click to skip</span>
+            </div>
+          </div>
+        </div>
       </div>
-      {["top-8 left-8 border-t-2 border-l-2 rounded-tl-xl","top-8 right-8 border-t-2 border-r-2 rounded-tr-xl","bottom-8 left-8 border-b-2 border-l-2 rounded-bl-xl","bottom-8 right-8 border-b-2 border-r-2 rounded-br-xl"].map((cls,i) => (
-        <div key={i} className={`absolute w-10 h-10 pointer-events-none ${cls}`} style={{ borderColor:`${rank.color}30` }} />
-      ))}
     </div>
   );
 }
@@ -1201,6 +1233,10 @@ export default function NeuralSyncMaster() {
         setHp(h => {
           const next = Math.max(0, h - HP_PER_ERROR);
           if (next <= 20 && h > 20) pushNotif("⚠ LOW HP!", "#f87171");
+          if (next <= 0) {
+            pushNotif("💀 HP ZERO — RESTARTING!", "#f87171");
+            setTimeout(() => resetSnippet(), 900);
+          }
           return next;
         });
         if (soundEnabled) audioRef.current?.err();
@@ -1488,6 +1524,7 @@ export default function NeuralSyncMaster() {
           isZenMode={isZenMode}             setIsZenMode={setIsZenMode}
           isRecallMode={isRecallMode}       setIsRecallMode={setIsRecallMode}
           isBlindMode={false}               setIsBlindMode={() => {}}
+          resetCurrentSnippet={resetSnippet}
         />
 
         {snippet && (
