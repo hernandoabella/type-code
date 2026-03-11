@@ -406,7 +406,10 @@ function CompletionScreen({ wpm, accuracy, time, combo, rank, onNext }: {
   wpm:number; accuracy:number; time:number; combo:number; rank:typeof RANKS[number]; onNext:()=>void;
 }) {
   const [count, setCount] = useState(COUNTDOWN_SECS);
-  const [ringKey, setRingKey] = useState(0);
+  // pct goes from 100 → 0 over (COUNTDOWN_SECS) seconds, updated every 50ms
+  const [pct, setPct] = useState(100);
+  const startedAt = useRef<number | null>(null);
+  const rafRef    = useRef<number>(0);
 
   // ESC to skip
   useEffect(() => {
@@ -415,15 +418,30 @@ function CompletionScreen({ wpm, accuracy, time, combo, rank, onNext }: {
     return () => window.removeEventListener("keydown", h);
   }, [onNext]);
 
+  // Single rAF loop — drives both the ring and the number
   useEffect(() => {
-    const startDelay = setTimeout(() => {
-      setRingKey(k => k + 1);
-      const interval = setInterval(() => {
-        setCount(c => { if (c <= 1) { clearInterval(interval); setTimeout(onNext, 300); return 0; } return c - 1; });
-      }, 1000);
-      return () => clearInterval(interval);
-    }, 1200);
-    return () => clearTimeout(startDelay);
+    const delay = setTimeout(() => {
+      startedAt.current = performance.now();
+      const totalMs = COUNTDOWN_SECS * 1000;
+
+      const tick = (now: number) => {
+        const elapsed = now - (startedAt.current ?? now);
+        const remaining = Math.max(0, totalMs - elapsed);
+        setPct(remaining / totalMs * 100);
+        setCount(Math.ceil(remaining / 1000));
+        if (remaining > 0) {
+          rafRef.current = requestAnimationFrame(tick);
+        } else {
+          setTimeout(onNext, 200);
+        }
+      };
+      rafRef.current = requestAnimationFrame(tick);
+    }, 800);
+
+    return () => {
+      clearTimeout(delay);
+      cancelAnimationFrame(rafRef.current);
+    };
   }, [onNext]);
 
   const stats = [
@@ -432,7 +450,10 @@ function CompletionScreen({ wpm, accuracy, time, combo, rank, onNext }: {
     { l:"TIME",  v:fmtTime(time),  color:"#e2e8f0" },
     { l:"COMBO", v:`${combo}x`,    color:"#a78bfa" },
   ];
-  const R = 28, C = 2 * Math.PI * R, dur = `${COUNTDOWN_SECS - 1}s`;
+
+  const R = 26;
+  const circ = 2 * Math.PI * R;
+  const dashOffset = circ * (1 - pct / 100);
 
   return (
     <div
@@ -440,14 +461,13 @@ function CompletionScreen({ wpm, accuracy, time, combo, rank, onNext }: {
       style={{ background:"rgba(3,3,5,0.75)", backdropFilter:"blur(16px)" }}
       onClick={onNext}
     >
-      {/* Card — click outside closes, click inside doesn't */}
       <div
         className="synced-title relative flex flex-col items-center gap-5 px-10 py-8 rounded-[2rem] border"
         style={{
           background: "rgba(6,6,10,0.97)",
           borderColor: `${rank.color}25`,
           boxShadow: `0 0 60px -10px ${rank.glow}, inset 0 1px 0 ${rank.color}12`,
-          maxWidth: 480,
+          maxWidth: 460,
           width: "90vw",
         }}
         onClick={e => e.stopPropagation()}
@@ -459,8 +479,7 @@ function CompletionScreen({ wpm, accuracy, time, combo, rank, onNext }: {
 
         {/* SYNCED title */}
         <div className="relative">
-          <span className="absolute select-none pointer-events-none"
-            style={{ fontFamily:"'Orbitron',monospace", fontSize:"clamp(2.2rem,6vw,3.5rem)", fontWeight:900, color:"transparent", WebkitTextStroke:`1px ${rank.color}20`, letterSpacing:"0.2em", transform:"scale(1.06)", filter:"blur(1.5px)", display:"block" }}>
+          <span className="absolute select-none pointer-events-none" style={{ fontFamily:"'Orbitron',monospace", fontSize:"clamp(2.2rem,6vw,3.5rem)", fontWeight:900, color:"transparent", WebkitTextStroke:`1px ${rank.color}20`, letterSpacing:"0.2em", transform:"scale(1.06)", filter:"blur(1.5px)", display:"block" }}>
             SYNCED
           </span>
           <span style={{ fontFamily:"'Orbitron',monospace", fontSize:"clamp(2.2rem,6vw,3.5rem)", fontWeight:900, color:"#fff", letterSpacing:"0.2em", lineHeight:1, textShadow:`0 0 30px ${rank.color}90,0 0 60px ${rank.color}30`, display:"block" }}>
@@ -469,8 +488,7 @@ function CompletionScreen({ wpm, accuracy, time, combo, rank, onNext }: {
         </div>
 
         {/* Rank badge */}
-        <div className="flex items-center gap-3 px-5 py-2 rounded-xl border"
-          style={{ borderColor:`${rank.color}30`, background:`${rank.color}0c` }}>
+        <div className="flex items-center gap-3 px-5 py-2 rounded-xl border" style={{ borderColor:`${rank.color}30`, background:`${rank.color}0c` }}>
           <span className="text-2xl font-black" style={{ fontFamily:"'Orbitron',monospace", color:rank.color, textShadow:`0 0 14px ${rank.color}` }}>{rank.id}</span>
           <span className="text-[9px] font-black uppercase tracking-[0.3em] opacity-60" style={{ fontFamily:"'Orbitron',monospace", color:rank.color }}>{rank.label}</span>
         </div>
@@ -485,25 +503,31 @@ function CompletionScreen({ wpm, accuracy, time, combo, rank, onNext }: {
           ))}
         </div>
 
-        {/* Countdown + ESC hint */}
+        {/* Countdown ring — driven by rAF pct, no CSS animation */}
         <div className="flex items-center gap-4">
           <div className="relative w-14 h-14 flex items-center justify-center flex-shrink-0">
-            <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 72 72">
-              <circle cx="36" cy="36" r={R} fill="none" stroke={`${rank.color}18`} strokeWidth="3" />
-              <circle key={ringKey} className="countdown-ring" cx="36" cy="36" r={R} fill="none" stroke={rank.color} strokeWidth="3" strokeLinecap="round"
-                strokeDasharray={C} strokeDashoffset={0}
-                style={{ animationDuration:dur, animationDelay:"1.2s", filter:`drop-shadow(0 0 4px ${rank.color})` }} />
+            <svg className="absolute inset-0 w-full h-full" viewBox="0 0 72 72" style={{ transform:"rotate(-90deg)" }}>
+              <circle cx="36" cy="36" r={R} fill="none" stroke={`${rank.color}15`} strokeWidth="3.5" />
+              <circle
+                cx="36" cy="36" r={R}
+                fill="none"
+                stroke={rank.color}
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                strokeDasharray={circ}
+                strokeDashoffset={dashOffset}
+                style={{ filter:`drop-shadow(0 0 4px ${rank.color})`, transition:"stroke-dashoffset 0.05s linear" }}
+              />
             </svg>
-            <span className="relative tabular-nums font-black text-xl"
-              style={{ fontFamily:"'Orbitron',monospace", color:count<=2?"#f87171":rank.color, transition:"color 0.3s" }}>
+            <span className="relative tabular-nums font-black text-xl" style={{ fontFamily:"'Orbitron',monospace", color:count<=2?"#f87171":rank.color, transition:"color 0.3s" }}>
               {count}
             </span>
           </div>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5">
             <span className="text-[8px] font-black uppercase tracking-[0.3em] opacity-25" style={{ fontFamily:"'Orbitron',monospace" }}>next challenge</span>
             <div className="flex items-center gap-2">
               <kbd className="px-2 py-0.5 rounded-md text-[7px] font-black" style={{ background:`${rank.color}15`, color:rank.color, fontFamily:"'Orbitron',monospace", border:`1px solid ${rank.color}25` }}>ESC</kbd>
-              <span className="text-[7px] opacity-20 uppercase tracking-wider" style={{ fontFamily:"'Orbitron',monospace" }}>or click to skip</span>
+              <span className="text-[7px] opacity-20 uppercase tracking-wider" style={{ fontFamily:"'Orbitron',monospace" }}>or click outside</span>
             </div>
           </div>
         </div>
@@ -511,6 +535,7 @@ function CompletionScreen({ wpm, accuracy, time, combo, rank, onNext }: {
     </div>
   );
 }
+
 
 // ─── Hex Grid ─────────────────────────────────────────────────────────────────
 function HexGrid({ color }: { color: string }) {
@@ -1125,7 +1150,7 @@ export default function NeuralSyncMaster() {
       while (acc2 + xpForLevel(newLvl) <= newXp) { acc2 += xpForLevel(newLvl); newLvl++; }
 
       // 3. Upsert leaderboard
-      await sb.from("leaderboard").upsert({
+      await (sb.from("leaderboard") as any).upsert({
         id:              user.id,
         username:        username ?? user.email?.split("@")[0] ?? "player",
         avatar_url:      avatarUrl ?? null,
@@ -1245,21 +1270,23 @@ export default function NeuralSyncMaster() {
           { x:0,  filter:"brightness(1) hue-rotate(0deg) saturate(1)", duration:0.14, ease:"rough", clearProps:"all" }
         );
       } else {
-        if (soundEnabled) audioRef.current?.key(combo);
+        if (!autoWriting && soundEnabled) audioRef.current?.key(combo);
         window.dispatchEvent(new Event("ns-key"));
-        const xpGain = XP_PER_CHAR * (1 + Math.floor(combo / 10));
-        gainXP(xpGain);
-        setCombo(c => {
-          const next = c + 1;
-          setMaxCombo(m => Math.max(m, next));
-          if (next === 5)  { pushNotif("🔥 COMBO x5!",    "#f97316"); if (soundEnabled) audioRef.current?.combo5(); }
-          if (next === 10) { pushNotif("⚡ COMBO x10!",   "#facc15"); if (soundEnabled) audioRef.current?.combo10(); }
-          if (next === 20) { pushNotif("💥 COMBO x20!",   "#a78bfa"); }
-          if (next === 50) { pushNotif("🌟 GODLIKE x50!", "#ec4899"); }
-          return next;
-        });
-        if (comboTimerRef.current) clearTimeout(comboTimerRef.current);
-        comboTimerRef.current = setTimeout(() => setCombo(0), COMBO_DECAY);
+        if (!autoWriting) {
+          const xpGain = XP_PER_CHAR * (1 + Math.floor(combo / 10));
+          gainXP(xpGain);
+          setCombo(c => {
+            const next = c + 1;
+            setMaxCombo(m => Math.max(m, next));
+            if (next === 5)  { pushNotif("🔥 COMBO x5!",    "#f97316"); if (soundEnabled) audioRef.current?.combo5(); }
+            if (next === 10) { pushNotif("⚡ COMBO x10!",   "#facc15"); if (soundEnabled) audioRef.current?.combo10(); }
+            if (next === 20) { pushNotif("💥 COMBO x20!",   "#a78bfa"); }
+            if (next === 50) { pushNotif("🌟 GODLIKE x50!", "#ec4899"); }
+            return next;
+          });
+          if (comboTimerRef.current) clearTimeout(comboTimerRef.current);
+          comboTimerRef.current = setTimeout(() => setCombo(0), COMBO_DECAY);
+        }
         const anyErr = val.split("").some((c,i) => c !== snippet.code[i]);
         setIsError(anyErr);
       }
@@ -1276,29 +1303,33 @@ export default function NeuralSyncMaster() {
       if (autoWriteRef.current) { clearInterval(autoWriteRef.current); autoWriteRef.current = null; }
       if (timerRef.current) clearInterval(timerRef.current);
       if (comboTimerRef.current) clearTimeout(comboTimerRef.current);
-      const newStreak = streak + 1;
-      const newTotal  = totalCompleted + 1;
-      setStreak(newStreak);
-      setTotalCompleted(newTotal);
-      const finalRank = getRank(calcAcc(val, snippet.code));
-      const finalAcc  = calcAcc(val, snippet.code);
-      const finalWpm  = startTime ? Math.round(val.length / 5 / ((Date.now() - startTime) / 60000)) || 0 : 0;
-      const xpGained  = snippet.code.length * 3 + combo * 5;
-      pushNotif(`${finalRank.id} RANK — ${finalRank.label}!`, finalRank.color);
-      gainXP(xpGained);
-      // Guardar en Supabase
-      saveSession({
-        snippetId: snippet.id,
-        wpmVal:    finalWpm,
-        accuracyVal: finalAcc,
-        timeVal:   startTime ? Date.now() - startTime : 0,
-        comboVal:  combo,
-        rankVal:   finalRank.id,
-        xpGained,
-        newStreak,
-        newTotal,
-      });
-      if (soundEnabled) audioRef.current?.win();
+      if (autoWriting) {
+        // BOT mode: just show completion, no scoring
+        pushNotif("🤖 BOT — no stats counted", "#6b7280");
+      } else {
+        const newStreak = streak + 1;
+        const newTotal  = totalCompleted + 1;
+        setStreak(newStreak);
+        setTotalCompleted(newTotal);
+        const finalRank = getRank(calcAcc(val, snippet.code));
+        const finalAcc  = calcAcc(val, snippet.code);
+        const finalWpm  = startTime ? Math.round(val.length / 5 / ((Date.now() - startTime) / 60000)) || 0 : 0;
+        const xpGained  = snippet.code.length * 3 + combo * 5;
+        pushNotif(`${finalRank.id} RANK — ${finalRank.label}!`, finalRank.color);
+        gainXP(xpGained);
+        saveSession({
+          snippetId: snippet.id,
+          wpmVal:    finalWpm,
+          accuracyVal: finalAcc,
+          timeVal:   startTime ? Date.now() - startTime : 0,
+          comboVal:  combo,
+          rankVal:   finalRank.id,
+          xpGained,
+          newStreak,
+          newTotal,
+        });
+        if (soundEnabled) audioRef.current?.win();
+      }
       gsap.timeline()
         .to(terminalRef.current, { boxShadow:`0 0 120px -10px ${accentShadow}`, duration:0.5, ease:"power2.out" })
         .to(terminalRef.current, { boxShadow:"none", duration:1.2, ease:"power2.in" });
